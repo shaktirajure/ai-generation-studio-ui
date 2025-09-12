@@ -15,6 +15,7 @@ export interface IStorage {
   getUserCredits(userId: string): Promise<number>;
   deductUserCredits(userId: string, amount: number): Promise<boolean>;
   consumeCredits(userId: string, amount: number): Promise<{ success: boolean; remaining: number }>;
+  addCredits(userId: string, amount: number): Promise<{ success: boolean; newTotal: number }>;
   ensureUser(userId: string): Promise<User>;
   // Asset management methods
   createAsset(asset: InsertAsset): Promise<Asset>;
@@ -120,6 +121,14 @@ export class MemStorage implements IStorage {
   async deductUserCredits(userId: string, amount: number): Promise<boolean> {
     const result = await this.consumeCredits(userId, amount);
     return result.success;
+  }
+
+  async addCredits(userId: string, amount: number): Promise<{ success: boolean; newTotal: number }> {
+    const user = await this.ensureUser(userId);
+    const newTotal = user.credits + amount;
+    const updatedUser: User = { ...user, credits: newTotal };
+    this.users.set(userId, updatedUser);
+    return { success: true, newTotal };
   }
 
   async ensureUser(userId: string): Promise<User> {

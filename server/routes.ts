@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, DEMO_USER_ID } from "./storage";
 import { insertJobSchema } from "@shared/schema";
+import { AIService } from "./ai-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // put application routes here
@@ -131,9 +132,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch the remote image
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(asset.url, {
-        timeout: 10000, // 10 second timeout
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error(`Failed to fetch asset ${id} from ${asset.url}: ${response.status}`);
@@ -186,21 +192,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString()
       });
       
-      // Simulate AI generation with placeholder images
-      const mockImageUrls = [
-        "https://picsum.photos/512/512?random=1",
-        "https://picsum.photos/512/512?random=2", 
-        "https://picsum.photos/512/512?random=3",
-        "https://picsum.photos/512/512?random=4",
-        "https://picsum.photos/512/512?random=5"
-      ];
+      // Call appropriate AI service based on job type
+      let generationResult;
+      switch (jobType) {
+        case "text-to-image":
+          generationResult = await AIService.generateTextToImage(prompt);
+          break;
+        case "text-to-3D":
+          generationResult = await AIService.generateTextTo3D(prompt);
+          break;
+        case "image-to-video":
+          generationResult = await AIService.generateImageToVideo(prompt);
+          break;
+        default:
+          return res.status(400).json({ 
+            error: `Unsupported job type: ${jobType}. Supported types are: text-to-image, text-to-3D, image-to-video` 
+          });
+      }
+
+      // Check if generation was successful
+      if (!generationResult.success) {
+        // Refund the credit since generation failed
+        await storage.addCredits(userId, 1);
+        return res.status(422).json({ 
+          error: "Generation failed",
+          message: generationResult.error || "Unknown error occurred during generation. Please try again."
+        });
+      }
       
-      const randomUrl = mockImageUrls[Math.floor(Math.random() * mockImageUrls.length)];
-      
-      // Create asset record
+      // Create asset record only if generation was successful
       const asset = await storage.createAsset({
         prompt,
-        url: randomUrl,
+        url: generationResult.url,
         jobType,
         userId
       });
