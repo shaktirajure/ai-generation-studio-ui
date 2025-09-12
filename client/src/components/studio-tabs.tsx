@@ -163,9 +163,9 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
   const isLoading = createJobMutation.isPending;
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-black/20 backdrop-blur-sm border border-white/10">
+        <TabsList className="flex w-full justify-center items-stretch gap-6 sm:gap-8 lg:gap-12 p-8 mb-8 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg">
           {Object.entries(toolInfo).map(([key, info]) => {
             const Icon = info.icon;
             const cost = toolCosts[key as keyof typeof toolCosts];
@@ -175,17 +175,19 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
               <TabsTrigger
                 key={key}
                 value={key}
-                className="flex flex-col items-center gap-1 py-3 data-[state=active]:bg-white/10"
+                className="flex flex-col items-center justify-center gap-3 px-6 py-6 flex-1 min-h-[140px] min-w-[140px] max-w-[180px] text-center text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 hover:bg-white/5 transition-all rounded-lg border-0 relative"
                 data-testid={`tab-${key}`}
               >
-                <Icon className="h-4 w-4" />
-                <span className="text-xs font-medium">{info.title}</span>
-                <Badge 
-                  variant={affordable ? "secondary" : "destructive"} 
-                  className="text-xs"
-                >
-                  {cost} credits
-                </Badge>
+                <div className="flex flex-col items-center justify-center w-full h-full space-y-3 py-2">
+                  <Icon className="h-8 w-8 flex-shrink-0" />
+                  <span className="text-xs font-medium leading-tight text-center whitespace-nowrap px-1">{info.title}</span>
+                  <Badge 
+                    variant={affordable ? "secondary" : "destructive"} 
+                    className="text-[9px] px-2 py-1 rounded-full flex-shrink-0"
+                  >
+                    {cost} credit{cost !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
               </TabsTrigger>
             );
           })}
@@ -199,7 +201,7 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
           const needsFileUpload = tool === "texturing" || tool === "img2video";
 
           return (
-            <TabsContent key={key} value={key} className="mt-6">
+            <TabsContent key={key} value={key} className="mt-8">
               <Card className="bg-black/20 backdrop-blur-sm border border-white/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">

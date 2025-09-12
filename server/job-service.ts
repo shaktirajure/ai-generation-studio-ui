@@ -95,7 +95,7 @@ export class JobService {
     });
 
     // Create job record and update heavy job counter if needed
-    const [job] = await db.transaction(async (tx) => {
+    const job = await db.transaction(async (tx) => {
       const [newJob] = await tx.insert(jobs).values({
         tool,
         prompt,
