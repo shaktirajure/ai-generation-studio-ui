@@ -83,13 +83,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get completed jobs endpoint
+  // Get assets endpoint  
   app.get("/api/assets", async (req, res) => {
     try {
-      const completedJobs = await storage.getCompletedJobs();
-      res.json(completedJobs);
+      // Use server-side user ID (demo user for now)
+      const userId = DEMO_USER_ID;
+      const assets = await storage.getAssets(userId);
+      res.json(assets);
     } catch (error) {
-      console.error("Error fetching completed jobs:", error);
+      console.error("Error fetching assets:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -104,6 +106,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user credits:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Generate content endpoint
+  app.post("/api/generate", async (req, res) => {
+    try {
+      const { prompt, jobType } = req.body;
+      
+      if (!prompt || !jobType) {
+        return res.status(400).json({ 
+          error: "Missing required fields: prompt and jobType are required" 
+        });
+      }
+
+      // Use server-side user ID (demo user for now)
+      const userId = DEMO_USER_ID;
+      
+      // Consume 1 credit for generation
+      const creditResult = await storage.consumeCredits(userId, 1);
+      if (!creditResult.success) {
+        return res.status(402).json({ 
+          error: "Insufficient credits",
+          message: `You need at least 1 credit to generate content. You have ${creditResult.remaining} credits remaining.`
+        });
+      }
+      
+      console.log("Generate request:", {
+        prompt,
+        jobType,
+        userId,
+        creditsRemaining: creditResult.remaining,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Simulate AI generation with placeholder images
+      const mockImageUrls = [
+        "https://picsum.photos/512/512?random=1",
+        "https://picsum.photos/512/512?random=2", 
+        "https://picsum.photos/512/512?random=3",
+        "https://picsum.photos/512/512?random=4",
+        "https://picsum.photos/512/512?random=5"
+      ];
+      
+      const randomUrl = mockImageUrls[Math.floor(Math.random() * mockImageUrls.length)];
+      
+      // Create asset record
+      const asset = await storage.createAsset({
+        prompt,
+        url: randomUrl,
+        jobType,
+        userId
+      });
+      
+      res.json({
+        success: true,
+        asset: {
+          id: asset.id,
+          prompt: asset.prompt,
+          url: asset.url,
+          jobType: asset.jobType,
+          createdAt: asset.createdAt
+        },
+        creditsRemaining: creditResult.remaining
+      });
+      
+    } catch (error) {
+      console.error("Error generating content:", error);
+      res.status(500).json({ error: "Failed to generate content" });
     }
   });
 

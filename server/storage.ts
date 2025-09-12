@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Job, type InsertJob } from "@shared/schema";
+import { type User, type InsertUser, type Job, type InsertJob, type Asset, type InsertAsset } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -16,6 +16,10 @@ export interface IStorage {
   deductUserCredits(userId: string, amount: number): Promise<boolean>;
   consumeCredits(userId: string, amount: number): Promise<{ success: boolean; remaining: number }>;
   ensureUser(userId: string): Promise<User>;
+  // Asset management methods
+  createAsset(asset: InsertAsset): Promise<Asset>;
+  getAssets(userId?: string): Promise<Asset[]>;
+  getAsset(id: string): Promise<Asset | undefined>;
 }
 
 // Demo user constant
@@ -24,10 +28,12 @@ export const DEMO_USER_ID = "demo-user";
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private jobs: Map<string, Job>;
+  private assets: Map<string, Asset>;
 
   constructor() {
     this.users = new Map();
     this.jobs = new Map();
+    this.assets = new Map();
     
     // Seed demo user at startup
     const demoUser: User = {
@@ -130,6 +136,37 @@ export class MemStorage implements IStorage {
       user = newUser;
     }
     return user;
+  }
+
+  // Asset management methods
+  async createAsset(insertAsset: InsertAsset): Promise<Asset> {
+    const id = randomUUID();
+    const asset: Asset = {
+      id,
+      ...insertAsset,
+      createdAt: new Date(),
+    };
+    // For now, store assets in memory as a Map
+    if (!this.assets) {
+      this.assets = new Map();
+    }
+    this.assets.set(id, asset);
+    return asset;
+  }
+
+  async getAssets(userId?: string): Promise<Asset[]> {
+    if (!this.assets) {
+      return [];
+    }
+    const allAssets = Array.from(this.assets.values());
+    if (userId) {
+      return allAssets.filter(asset => asset.userId === userId);
+    }
+    return allAssets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getAsset(id: string): Promise<Asset | undefined> {
+    return this.assets?.get(id);
   }
 }
 
