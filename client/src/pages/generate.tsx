@@ -22,29 +22,25 @@ const generateFormSchema = z.object({
 
 type GenerateFormData = z.infer<typeof generateFormSchema>;
 
-interface WebhookResponse {
-  status: string;
-  jobId: string;
-  creditsRemaining?: number;
+interface GenerateResponse {
+  success: boolean;
+  asset: {
+    id: string;
+    prompt: string;
+    url: string;
+    jobType: string;
+    createdAt: string;
+  };
+  creditsRemaining: number;
 }
 
-interface WebhookError {
+interface GenerateError {
   error: string;
-  message: string;
-}
-
-interface JobStatus {
-  id: string;
-  status: "pending" | "done";
-  jobType: string;
-  inputText: string;
-  userId: string;
-  createdAt: string;
-  resultUrl?: string;
+  message?: string;
 }
 
 export default function Generate() {
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [generatedAsset, setGeneratedAsset] = useState<GenerateResponse['asset'] | null>(null);
   const { toast } = useToast();
 
   const form = useForm<GenerateFormData>({
@@ -55,61 +51,45 @@ export default function Generate() {
     },
   });
 
-  // Job status polling query
-  const { data: jobStatus, isLoading: isPolling } = useQuery<JobStatus>({
-    queryKey: ["/api/job", currentJobId],
-    queryFn: async (): Promise<JobStatus> => {
-      if (!currentJobId) throw new Error("No job ID");
-      const response = await fetch(`/api/job/${currentJobId}`);
-      if (!response.ok) throw new Error("Failed to fetch job status");
-      return response.json();
-    },
-    enabled: !!currentJobId,
-    refetchInterval: (query) => {
-      // Stop polling when job is done
-      return query.state.data?.status === "done" ? false : 2000;
-    },
-  });
+  // Remove job polling as we now get immediate results
 
-  // Webhook submission mutation
-  const submitJobMutation = useMutation({
-    mutationFn: async (data: GenerateFormData): Promise<WebhookResponse> => {
-      const response = await apiRequest("POST", "/webhook", {
+  // Generate content mutation
+  const generateMutation = useMutation({
+    mutationFn: async (data: GenerateFormData): Promise<GenerateResponse> => {
+      const response = await apiRequest("POST", "/api/generate", {
+        prompt: data.prompt,
         jobType: data.jobType,
-        inputText: data.prompt,
-        // userId is now handled server-side for security
       });
       
       // Handle credit errors
       if (response.status === 402) {
-        const errorData: WebhookError = await response.json();
+        const errorData: GenerateError = await response.json();
         throw new Error(errorData.message || "Insufficient credits");
       }
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to submit job");
+        throw new Error(errorData.message || "Failed to generate content");
       }
       
       return response.json();
     },
     onSuccess: (response) => {
-      setCurrentJobId(response.jobId);
+      setGeneratedAsset(response.asset);
       
       // Refresh credits in navbar
       queryClient.invalidateQueries({ queryKey: ['/api/credits'] });
       
+      // Refresh assets page
+      queryClient.invalidateQueries({ queryKey: ['/api/assets'] });
+      
       toast({
-        title: "Job submitted!",
-        description: `Your generation request has been submitted. ${
-          response.creditsRemaining !== undefined 
-            ? `${response.creditsRemaining} credits remaining.`
-            : ""
-        }`,
+        title: "Generation Complete!",
+        description: `Your content has been generated successfully. ${response.creditsRemaining} credits remaining.`,
       });
     },
     onError: (error) => {
-      const errorMessage = error instanceof Error ? error.message : "Failed to submit job. Please try again.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate content. Please try again.";
       
       // Show specific error for insufficient credits
       if (errorMessage.includes("credit")) {
@@ -125,16 +105,16 @@ export default function Generate() {
           variant: "destructive",
         });
       }
-      console.error("Webhook submission error:", error);
+      console.error("Generation error:", error);
     },
   });
 
   const onSubmit = (data: GenerateFormData) => {
-    submitJobMutation.mutate(data);
+    generateMutation.mutate(data);
   };
 
   const resetForm = () => {
-    setCurrentJobId(null);
+    setGeneratedAsset(null);
     form.reset();
   };
 
@@ -211,21 +191,21 @@ export default function Generate() {
                   <div className="flex gap-3">
                     <Button
                       type="submit"
-                      disabled={submitJobMutation.isPending || isPolling}
+                      disabled={generateMutation.isPending}
                       className="flex-1"
                       data-testid="button-generate"
                     >
-                      {submitJobMutation.isPending ? (
+                      {generateMutation.isPending ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Submitting...
+                          Generating...
                         </>
                       ) : (
                         "Generate"
                       )}
                     </Button>
                     
-                    {currentJobId && (
+                    {generatedAsset && (
                       <Button
                         type="button"
                         variant="outline"
@@ -250,111 +230,93 @@ export default function Generate() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!currentJobId ? (
+              {!generatedAsset ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>Submit a generation request to see status</p>
+                  <p>Submit a generation request to see your result</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Job Info */}
+                  {/* Asset Info */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Job ID:</span>
-                      <code className="text-xs bg-muted px-2 py-1 rounded" data-testid="text-job-id">
-                        {currentJobId.slice(0, 8)}...
+                      <span className="text-sm font-medium">Asset ID:</span>
+                      <code className="text-xs bg-muted px-2 py-1 rounded" data-testid="text-asset-id">
+                        {generatedAsset.id.slice(0, 8)}...
                       </code>
                     </div>
                     
-                    {jobStatus && (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">Type:</span>
-                          <span className="text-sm capitalize" data-testid="text-job-type">
-                            {jobStatus.jobType.replace("-", " ")}
-                          </span>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">Status:</span>
-                          <div className="flex items-center gap-2">
-                            {jobStatus.status === "pending" && (
-                              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                            )}
-                            <span 
-                              className={`text-sm font-medium capitalize ${
-                                jobStatus.status === "done" ? "text-green-600" : "text-blue-600"
-                              }`}
-                              data-testid="text-job-status"
-                            >
-                              {jobStatus.status}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Type:</span>
+                      <span className="text-sm capitalize" data-testid="text-asset-type">
+                        {generatedAsset.jobType.replace("-", " ")}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Created:</span>
+                      <span className="text-sm" data-testid="text-asset-created">
+                        {new Date(generatedAsset.createdAt).toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Processing Message */}
-                  {isPolling && jobStatus && (jobStatus as JobStatus).status === "pending" && (
-                    <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm font-medium">
-                          Processing your request...
-                        </span>
-                      </div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                        This usually takes a few moments
-                      </p>
+                  {/* Generated Result */}
+                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border space-y-3">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                      <Eye className="w-4 h-4" />
+                      <span className="text-sm font-medium">Generation Complete!</span>
                     </div>
-                  )}
-
-                  {/* Completed Result */}
-                  {jobStatus?.status === "done" && jobStatus.resultUrl && (
-                    <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border space-y-3">
-                      <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
-                        <Eye className="w-4 h-4" />
-                        <span className="text-sm font-medium">Generation Complete!</span>
+                    
+                    <div className="space-y-3">
+                      {/* Image Preview */}
+                      <div className="relative bg-white dark:bg-gray-800 rounded-lg overflow-hidden border">
+                        <img
+                          src={generatedAsset.url}
+                          alt={generatedAsset.prompt}
+                          className="w-full h-48 object-cover"
+                          data-testid="img-generated-result"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTQ5NEE0IiBmb250LXNpemU9IjE0Ij5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+Cjwvc3ZnPg==";
+                          }}
+                        />
                       </div>
                       
-                      <div className="space-y-2">
-                        <p className="text-xs text-green-600 dark:text-green-400">
-                          Your content has been generated successfully
+                      {/* Prompt Display */}
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Prompt:</p>
+                        <p className="text-sm" data-testid="text-asset-prompt">
+                          {generatedAsset.prompt}
                         </p>
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => window.open(jobStatus.resultUrl, '_blank')}
-                            data-testid="button-view-result"
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Result
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = jobStatus.resultUrl!;
-                              link.download = `generated-${jobStatus.jobType}-${jobStatus.id.slice(0, 8)}.png`;
-                              link.click();
-                            }}
-                            data-testid="button-download-result"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded border">
-                          <p className="text-xs text-muted-foreground break-all" data-testid="text-result-url">
-                            {jobStatus.resultUrl}
-                          </p>
-                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        Your content has been generated and saved to your assets
+                      </p>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => window.open(generatedAsset.url, '_blank')}
+                          data-testid="button-view-result"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Full Size
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            window.location.href = `/api/assets/${generatedAsset.id}/download`;
+                          }}
+                          data-testid="button-download-result"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </CardContent>

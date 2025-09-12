@@ -8,14 +8,13 @@ import { Search, Download, Eye, Calendar, Image, Box, PlayCircle } from "lucide-
 import { Link } from "wouter";
 import { format } from "date-fns";
 
-interface CompletedJob {
+interface Asset {
   id: string;
-  status: "done";
+  prompt: string;
+  url: string;
   jobType: string;
-  inputText: string;
   userId: string;
   createdAt: string;
-  resultUrl: string;
 }
 
 function getJobTypeIcon(jobType: string) {
@@ -44,60 +43,48 @@ function getJobTypeColor(jobType: string) {
   }
 }
 
-function AssetPlaceholder({ jobType }: { jobType: string }) {
-  const baseClasses = "aspect-video rounded-lg flex items-center justify-center text-white font-medium text-lg";
-  
-  switch (jobType) {
-    case "text-to-image":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-blue-400 to-blue-600`}>
-          <div className="flex flex-col items-center gap-2">
-            <Image className="w-8 h-8" />
-            <span className="text-sm">Image</span>
-          </div>
-        </div>
-      );
-    case "text-to-3D":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-green-400 to-green-600`}>
-          <div className="flex flex-col items-center gap-2">
-            <Box className="w-8 h-8" />
-            <span className="text-sm">3D Model</span>
-          </div>
-        </div>
-      );
-    case "image-to-video":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-purple-400 to-purple-600`}>
-          <div className="flex flex-col items-center gap-2">
-            <PlayCircle className="w-8 h-8" />
-            <span className="text-sm">Video</span>
-          </div>
-        </div>
-      );
-    default:
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-gray-400 to-gray-600`}>
-          <div className="flex flex-col items-center gap-2">
-            <Image className="w-8 h-8" />
-            <span className="text-sm">Asset</span>
-          </div>
-        </div>
-      );
-  }
+function AssetThumbnail({ asset }: { asset: Asset }) {
+  return (
+    <div className="aspect-video rounded-lg overflow-hidden bg-muted">
+      <img
+        src={asset.url}
+        alt={asset.prompt}
+        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.parentElement!.innerHTML = `
+            <div class="aspect-video rounded-lg flex items-center justify-center text-white font-medium text-lg bg-gradient-to-br ${
+              asset.jobType === "text-to-image" ? "from-blue-400 to-blue-600" :
+              asset.jobType === "text-to-3D" ? "from-green-400 to-green-600" :
+              asset.jobType === "image-to-video" ? "from-purple-400 to-purple-600" :
+              "from-gray-400 to-gray-600"
+            }">
+              <div class="flex flex-col items-center gap-2">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" />
+                </svg>
+                <span class="text-sm">${asset.jobType.replace("-", " ")}</span>
+              </div>
+            </div>
+          `;
+        }}
+        data-testid={`thumbnail-${asset.id}`}
+      />
+    </div>
+  );
 }
 
 export default function Assets() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: completedJobs = [], isLoading, error } = useQuery<CompletedJob[]>({
+  const { data: assets = [], isLoading, error } = useQuery<Asset[]>({
     queryKey: ["/api/assets"],
-    refetchInterval: 30000, // Refresh every 30 seconds to pick up new completed jobs
+    refetchInterval: 30000, // Refresh every 30 seconds to pick up new assets
   });
 
-  const filteredJobs = completedJobs.filter(job =>
-    job.inputText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.jobType.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAssets = assets.filter(asset =>
+    asset.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    asset.jobType.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (error) {
@@ -162,7 +149,7 @@ export default function Assets() {
               </Card>
             ))}
           </div>
-        ) : filteredJobs.length === 0 ? (
+        ) : filteredAssets.length === 0 ? (
           <div className="bg-muted/50 rounded-lg p-6 text-center">
             <div className="space-y-2">
               <h3 className="text-lg font-semibold">
@@ -195,38 +182,38 @@ export default function Assets() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredJobs.map((job) => (
-              <Card key={job.id} className="group hover:shadow-lg transition-shadow" data-testid={`asset-card-${job.id}`}>
+            {filteredAssets.map((asset) => (
+              <Card key={asset.id} className="group hover:shadow-lg transition-shadow" data-testid={`asset-card-${asset.id}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <Badge 
-                      className={`flex items-center gap-1 ${getJobTypeColor(job.jobType)}`}
-                      data-testid={`badge-job-type-${job.jobType}`}
+                      className={`flex items-center gap-1 ${getJobTypeColor(asset.jobType)}`}
+                      data-testid={`badge-job-type-${asset.jobType}`}
                     >
-                      {getJobTypeIcon(job.jobType)}
-                      {job.jobType.replace("-", " ")}
+                      {getJobTypeIcon(asset.jobType)}
+                      {asset.jobType.replace("-", " ")}
                     </Badge>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="w-3 h-3" />
-                      <span data-testid={`date-${job.id}`}>
-                        {format(new Date(job.createdAt), "MMM d")}
+                      <span data-testid={`date-${asset.id}`}>
+                        {format(new Date(asset.createdAt), "MMM d")}
                       </span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <AssetPlaceholder jobType={job.jobType} />
+                  <AssetThumbnail asset={asset} />
                   <div className="space-y-2 mt-3">
-                    <h4 className="font-medium line-clamp-2 text-sm" data-testid={`prompt-${job.id}`}>
-                      {job.inputText}
+                    <h4 className="font-medium line-clamp-2 text-sm" data-testid={`prompt-${asset.id}`}>
+                      {asset.prompt}
                     </h4>
                     <div className="flex gap-2">
                       <Button 
                         size="sm" 
                         variant="outline" 
                         className="flex-1"
-                        onClick={() => window.open(job.resultUrl, '_blank')}
-                        data-testid={`button-view-${job.id}`}
+                        onClick={() => window.open(asset.url, '_blank')}
+                        data-testid={`button-view-${asset.id}`}
                       >
                         <Eye className="w-4 h-4 mr-1" />
                         View
@@ -236,12 +223,9 @@ export default function Assets() {
                         variant="outline" 
                         className="flex-1"
                         onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = job.resultUrl;
-                          link.download = `${job.jobType}-${job.id.slice(0, 8)}.png`;
-                          link.click();
+                          window.location.href = `/api/assets/${asset.id}/download`;
                         }}
-                        data-testid={`button-download-${job.id}`}
+                        data-testid={`button-download-${asset.id}`}
                       >
                         <Download className="w-4 h-4 mr-1" />
                         Download
@@ -254,9 +238,9 @@ export default function Assets() {
           </div>
         )}
 
-        {filteredJobs.length > 0 && (
+        {filteredAssets.length > 0 && (
           <div className="text-center text-sm text-muted-foreground">
-            Showing {filteredJobs.length} of {completedJobs.length} completed jobs
+            Showing {filteredAssets.length} of {assets.length} assets
           </div>
         )}
       </div>

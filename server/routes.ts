@@ -109,6 +109,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download asset endpoint
+  app.get("/api/assets/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ error: "Asset ID is required" });
+      }
+
+      // Get asset by ID (ensure it belongs to the current user)
+      const asset = await storage.getAsset(id);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+
+      // Verify asset belongs to current user (for security)
+      const userId = DEMO_USER_ID;
+      if (asset.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Fetch the remote image
+      const response = await fetch(asset.url, {
+        timeout: 10000, // 10 second timeout
+      });
+
+      if (!response.ok) {
+        console.error(`Failed to fetch asset ${id} from ${asset.url}: ${response.status}`);
+        return res.status(502).json({ error: "Failed to fetch asset" });
+      }
+
+      // Set download headers
+      const filename = `${asset.jobType}-${asset.id.slice(0, 8)}.png`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+      
+      // Stream the image data
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+      
+    } catch (error) {
+      console.error("Error downloading asset:", error);
+      res.status(500).json({ error: "Failed to download asset" });
+    }
+  });
+
   // Generate content endpoint
   app.post("/api/generate", async (req, res) => {
     try {
