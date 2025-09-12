@@ -6,48 +6,48 @@
 
 :root {
   /* AI Studio Brand Colors */
-  --bg: #0B0F1A;
+  --bg: 224 42% 8%;
   --panel: rgba(255, 255, 255, 0.04);
-  --muted: #8A93A6;
-  --primary: #7C3AED;
-  --primary-2: #22D3EE;
-  --accent: #F59E0B;
-  --success: #22C55E;
-  --danger: #EF4444;
+  --muted: 216 12% 63%;
+  --primary: 262 84% 58%;
+  --primary-2: 195 100% 53%;
+  --accent: 38 95% 51%;
+  --success: 142 71% 45%;
+  --danger: 0 85% 60%;
 
   /* Dark Theme (default) */
-  --background: var(--bg);
+  --background: hsl(var(--bg));
   --foreground: hsl(220 14% 96%);
   --card: var(--panel);
   --card-foreground: hsl(220 14% 96%);
   --popover: hsl(219 29% 14%);
   --popover-foreground: hsl(220 14% 96%);
-  --primary: var(--primary);
+  --primary: hsl(var(--primary));
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(220 14% 13%);
   --secondary-foreground: hsl(220 14% 96%);
   --muted: hsl(220 14% 11%);
-  --muted-foreground: var(--muted);
-  --accent: var(--accent);
+  --muted-foreground: hsl(var(--muted));
+  --accent: hsl(var(--accent));
   --accent-foreground: hsl(219 29% 14%);
-  --destructive: var(--danger);
+  --destructive: hsl(var(--danger));
   --destructive-foreground: hsl(0 0% 100%);
   --border: rgba(255, 255, 255, 0.1);
   --input: hsl(220 14% 11%);
-  --ring: var(--primary);
-  --chart-1: var(--primary);
-  --chart-2: var(--primary-2);
-  --chart-3: var(--accent);
-  --chart-4: var(--success);
-  --chart-5: var(--danger);
+  --ring: hsl(var(--primary));
+  --chart-1: hsl(var(--primary));
+  --chart-2: hsl(var(--primary-2));
+  --chart-3: hsl(var(--accent));
+  --chart-4: hsl(var(--success));
+  --chart-5: hsl(var(--danger));
   --sidebar: var(--panel);
   --sidebar-foreground: hsl(220 14% 96%);
-  --sidebar-primary: var(--primary);
+  --sidebar-primary: hsl(var(--primary));
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: var(--panel);
   --sidebar-accent-foreground: hsl(220 14% 96%);
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: var(--primary);
+  --sidebar-ring: hsl(var(--primary));
   
   /* Typography */
   --font-sans: Inter, system-ui, -apple-system, sans-serif;
@@ -73,31 +73,31 @@
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
-[data-theme="light"] {
+:root:not(.dark) {
   /* Light Theme Override */
-  --bg: hsl(0 0% 100%);
+  --bg: 0 0% 100%;
   --panel: rgba(0, 0, 0, 0.04);
-  --muted: #6B7280;
+  --muted: 216 13% 47%;
   
-  --background: var(--bg);
+  --background: hsl(var(--bg));
   --foreground: hsl(220 14% 4%);
   --card: var(--panel);
   --card-foreground: hsl(220 14% 4%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(220 14% 4%);
-  --primary: var(--primary);
+  --primary: hsl(var(--primary));
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(220 14% 96%);
   --secondary-foreground: hsl(220 14% 4%);
   --muted: hsl(220 14% 96%);
-  --muted-foreground: var(--muted);
-  --accent: var(--accent);
+  --muted-foreground: hsl(var(--muted));
+  --accent: hsl(var(--accent));
   --accent-foreground: hsl(0 0% 100%);
-  --destructive: var(--danger);
+  --destructive: hsl(var(--danger));
   --destructive-foreground: hsl(0 0% 100%);
   --border: rgba(0, 0, 0, 0.1);
   --input: hsl(220 14% 96%);
-  --ring: var(--primary);
+  --ring: hsl(var(--primary));
   --sidebar: var(--panel);
   --sidebar-foreground: hsl(220 14% 4%);
   --sidebar-border: rgba(0, 0, 0, 0.1);
@@ -286,9 +286,78 @@
   }
 }
 
-/* Hero gradient background */
+/* Hero gradient background with animated beams */
 .hero-gradient {
-  background: radial-gradient(ellipse at center, rgba(124, 58, 237, 0.15) 0%, transparent 70%);
+  position: relative;
+  background: hsl(var(--bg));
+  overflow: hidden;
+}
+
+.hero-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(34, 211, 238, 0.3) 0%, transparent 50%),
+    conic-gradient(from 0deg at 50% 50%, 
+      transparent 0deg,
+      rgba(124, 58, 237, 0.1) 60deg,
+      transparent 120deg,
+      rgba(34, 211, 238, 0.1) 180deg,
+      transparent 240deg,
+      rgba(245, 158, 11, 0.1) 300deg,
+      transparent 360deg
+    );
+  animation: hero-beam 20s linear infinite;
+  will-change: transform;
+}
+
+.hero-gradient::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(ellipse 120% 80% at 40% 60%, rgba(124, 58, 237, 0.15) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 60% at 80% 40%, rgba(34, 211, 238, 0.1) 0%, transparent 70%);
+  animation: hero-beam-slow 30s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes hero-beam {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  33% {
+    transform: rotate(120deg) scale(1.1);
+  }
+  66% {
+    transform: rotate(240deg) scale(0.9);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes hero-beam-slow {
+  0% {
+    transform: translateX(-10%) translateY(-10%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateX(5%) translateY(5%) scale(1.05);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(-5%) translateY(-15%) scale(0.95);
+    opacity: 0.6;
+  }
 }
 
 /* Animated blobs for hero canvas */

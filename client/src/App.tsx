@@ -3,7 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Navbar from "@/components/navbar";
+import StudioNavbar from "@/components/ui/studio-navbar";
+import StudioFooter from "@/components/ui/studio-footer";
 import Home from "@/pages/home";
 import Generate from "@/pages/generate";
 import Assets from "@/pages/assets";
@@ -12,9 +13,9 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main>
+    <div className="min-h-screen bg-background flex flex-col">
+      <StudioNavbar />
+      <main className="flex-1">
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/generate" component={Generate} />
@@ -24,6 +25,7 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
       </main>
+      <StudioFooter />
     </div>
   );
 }
