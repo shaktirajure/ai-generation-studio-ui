@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, DEMO_USER_ID } from "./storage";
 import { insertJobSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -13,16 +13,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Webhook endpoint
   app.post("/webhook", async (req, res) => {
     try {
-      const { jobType, inputText, userId } = req.body;
+      const { jobType, inputText } = req.body;
+      
+      // Use server-side user ID (demo user for now)
+      const userId = DEMO_USER_ID;
       
       // Validate the request body
       const validatedData = insertJobSchema.parse({ jobType, inputText, userId });
+      
+      // Atomically check and consume 1 credit
+      const creditResult = await storage.consumeCredits(userId, 1);
+      if (!creditResult.success) {
+        return res.status(402).json({ 
+          error: "Insufficient credits",
+          message: `You need at least 1 credit to create a job. You have ${creditResult.remaining} credits remaining.`
+        });
+      }
       
       // Log the incoming request to console
       console.log("Webhook received:", {
         jobType,
         inputText,
         userId,
+        creditsRemaining: creditResult.remaining,
         timestamp: new Date().toISOString()
       });
       
@@ -31,7 +44,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         status: "received",
-        jobId: job.id
+        jobId: job.id,
+        creditsRemaining: creditResult.remaining
       });
     } catch (error) {
       console.error("Error processing webhook:", error);
@@ -76,6 +90,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(completedJobs);
     } catch (error) {
       console.error("Error fetching completed jobs:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get current user credits endpoint
+  app.get("/api/credits", async (req, res) => {
+    try {
+      // Use server-side user ID (demo user for now)
+      const userId = DEMO_USER_ID;
+      const credits = await storage.getUserCredits(userId);
+      res.json({ credits });
+    } catch (error) {
+      console.error("Error fetching user credits:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

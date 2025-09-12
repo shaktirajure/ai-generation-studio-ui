@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Download, Eye } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Loader2, Download, Eye, AlertCircle } from "lucide-react";
 
 const generateFormSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
@@ -25,6 +25,12 @@ type GenerateFormData = z.infer<typeof generateFormSchema>;
 interface WebhookResponse {
   status: string;
   jobId: string;
+  creditsRemaining?: number;
+}
+
+interface WebhookError {
+  error: string;
+  message: string;
 }
 
 interface JobStatus {
@@ -71,23 +77,54 @@ export default function Generate() {
       const response = await apiRequest("POST", "/webhook", {
         jobType: data.jobType,
         inputText: data.prompt,
-        userId: "user123", // In a real app, this would come from auth
+        // userId is now handled server-side for security
       });
+      
+      // Handle credit errors
+      if (response.status === 402) {
+        const errorData: WebhookError = await response.json();
+        throw new Error(errorData.message || "Insufficient credits");
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to submit job");
+      }
+      
       return response.json();
     },
     onSuccess: (response) => {
       setCurrentJobId(response.jobId);
+      
+      // Refresh credits in navbar
+      queryClient.invalidateQueries({ queryKey: ['/api/credits'] });
+      
       toast({
         title: "Job submitted!",
-        description: "Your generation request has been submitted and is being processed.",
+        description: `Your generation request has been submitted. ${
+          response.creditsRemaining !== undefined 
+            ? `${response.creditsRemaining} credits remaining.`
+            : ""
+        }`,
       });
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to submit job. Please try again.",
-        variant: "destructive",
-      });
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit job. Please try again.";
+      
+      // Show specific error for insufficient credits
+      if (errorMessage.includes("credit")) {
+        toast({
+          title: "Insufficient Credits",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
       console.error("Webhook submission error:", error);
     },
   });

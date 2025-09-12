@@ -14,8 +14,12 @@ export interface IStorage {
   getCompletedJobs(): Promise<Job[]>;
   getUserCredits(userId: string): Promise<number>;
   deductUserCredits(userId: string, amount: number): Promise<boolean>;
+  consumeCredits(userId: string, amount: number): Promise<{ success: boolean; remaining: number }>;
   ensureUser(userId: string): Promise<User>;
 }
+
+// Demo user constant
+export const DEMO_USER_ID = "demo-user";
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
@@ -24,6 +28,15 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = new Map();
     this.jobs = new Map();
+    
+    // Seed demo user at startup
+    const demoUser: User = {
+      id: DEMO_USER_ID,
+      username: "demo-user",
+      password: "temp",
+      credits: 20
+    };
+    this.users.set(DEMO_USER_ID, demoUser);
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -85,22 +98,36 @@ export class MemStorage implements IStorage {
     return user.credits;
   }
 
-  async deductUserCredits(userId: string, amount: number): Promise<boolean> {
+  async consumeCredits(userId: string, amount: number): Promise<{ success: boolean; remaining: number }> {
     const user = await this.ensureUser(userId);
     if (user.credits < amount) {
-      return false; // Insufficient credits
+      return { success: false, remaining: user.credits }; // Insufficient credits
     }
     
-    const updatedUser: User = { ...user, credits: user.credits - amount };
+    const newCredits = user.credits - amount;
+    const updatedUser: User = { ...user, credits: newCredits };
     this.users.set(userId, updatedUser);
-    return true; // Credits deducted successfully
+    return { success: true, remaining: newCredits }; // Credits deducted successfully
+  }
+
+  // Legacy method for compatibility
+  async deductUserCredits(userId: string, amount: number): Promise<boolean> {
+    const result = await this.consumeCredits(userId, amount);
+    return result.success;
   }
 
   async ensureUser(userId: string): Promise<User> {
     let user = await this.getUser(userId);
     if (!user) {
-      // Create a default user if it doesn't exist
-      user = await this.createUser({ username: userId, password: 'temp' });
+      // Create a user with the provided userId as the key
+      const newUser: User = {
+        id: userId,
+        username: userId,
+        password: 'temp',
+        credits: 20
+      };
+      this.users.set(userId, newUser);
+      user = newUser;
     }
     return user;
   }
