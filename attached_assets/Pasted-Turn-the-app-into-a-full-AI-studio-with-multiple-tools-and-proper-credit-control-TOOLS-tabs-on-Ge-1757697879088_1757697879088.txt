@@ -1,0 +1,32 @@
+Turn the app into a full AI studio with multiple tools and proper credit control.
+
+TOOLS (tabs on Generate):
+1) Text to Image (already works) → keep as-is.
+2) Text to 3D (REAL) → integrate a vendor adapter (Meshy or Replicate) behind a server “provider” layer. Use env vars to choose provider: PROVIDER_3D = "SIM" | "MESHY" | "REPLICATE". If SIM, return a known public .glb. If MESHY/REPLICATE, create a job and handle async status via a webhook.
+3) AI Texturing (REAL) → let the user upload or pick a base model (.glb) and generate PBR maps (albedo/normal/roughness/metallic). Same provider pattern: PROVIDER_TEXTURE = "SIM" | "MESHY". Preview maps in the viewer.
+4) Image to Video (REAL) → provider pattern again: PROVIDER_VIDEO = "SIM" | "REPLICATE". Accept an image or a prompt. Show an MP4 link when done.
+
+SERVER:
+- Implement provider adapters with clean interfaces. Adapters handle kickoff and status fetch. For async providers, register a verified webhook endpoint /api/webhooks/vendor with HMAC (x-signature) using WEBHOOK_SECRET. Also support a SIMULATE_WEBHOOKS flag that fires a signed callback after 6s.
+- Job model: {id, tool:"text2image"|"text2mesh"|"texturing"|"img2video", prompt, inputs (image/model), status, asset_url(s), meta, created_at, session_id }.
+- Credits: start each session with 25 credits. Costs: text2image=1, text2mesh=5, texturing=3, img2video=4. Atomic decrement; block if insufficient; show a clear message.
+- Quotas: max 5 heavy jobs/hour (text2mesh, texturing, img2video). Rate-limit write routes 10/min/IP.
+- Env: PROVIDER_3D, PROVIDER_TEXTURE, PROVIDER_VIDEO, WEBHOOK_SECRET, ADMIN_PASSWORD, plus vendor keys (e.g., MESHY_API_KEY, REPLICATE_API_TOKEN). Fall back to SIM if keys are missing.
+
+FRONTEND:
+- Generate page: top tabs for the four tools; each tab shows the correct fields (prompt, image upload, or model upload). Show “Estimated cost: X credits” and disable if not enough.
+- Status panel: immediately shows “Queued/Processing” and updates until Succeeded/Failed. On success: 
+   - text2image → show image + Download.
+   - text2mesh → open 3D viewer with orbit controls and a Download (.glb).
+   - texturing → show PBR maps grid and a “Preview on model” toggle in the viewer.
+   - img2video → show video player + Download.
+- Assets page: paginated grid. Thumbs: image/video frame/model snapshot. Detail modal with metadata and downloads. Support delete.
+- 3D viewer: three.js + GLTFLoader; add lights, environment map, and performance fallback on low-end devices.
+- API page: code samples for each tool (kickoff + webhook payload examples). Copy buttons.
+
+UX:
+- Keep the professional studio look (glass, gradients, subtle framer-motion). 
+- Show remaining credits in navbar; add Admin top-up (x-admin-password).
+- Robust error toasts for vendor errors and signature failures.
+
+Make sure all routes work end-to-end in SIM mode with no external keys. If provider keys are present, use the real vendor with webhooks. Do not remove existing working features; only extend them.

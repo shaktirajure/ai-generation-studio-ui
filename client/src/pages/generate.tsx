@@ -115,7 +115,12 @@ export default function Generate() {
 
   const resetForm = () => {
     setGeneratedAsset(null);
-    form.reset();
+    form.reset({
+      prompt: "",
+      jobType: undefined,
+    });
+    // Clear any validation errors
+    form.clearErrors();
   };
 
   return (
@@ -165,7 +170,10 @@ export default function Generate() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Generation Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value || ""}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-job-type">
                               <SelectValue placeholder="Select generation type" />

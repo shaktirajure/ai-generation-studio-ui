@@ -1,8 +1,5 @@
-import OpenAI from "openai";
-
-// Using the javascript_openai integration
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Using Hugging Face free inference API for image generation
+// No API key required for basic usage, but we can use one for higher rate limits if available
 
 export interface GenerationResult {
   url: string;
@@ -12,51 +9,80 @@ export interface GenerationResult {
 
 export class AIService {
   /**
-   * Generate an image from text using DALL-E 3
+   * Generate an image from text using Hugging Face FLUX.1 (FREE)
    */
   static async generateTextToImage(prompt: string): Promise<GenerationResult> {
     try {
-      console.log("Generating image with DALL-E 3 for prompt:", prompt);
+      console.log("[HF DEBUG] Generating image with FLUX.1 for prompt:", prompt);
       
-      const response = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "standard",
-      });
+      // Use Hugging Face's free FLUX model inference API - FLUX.1 is the new leading open-source model in 2025
+      const response = await fetch(
+        "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            // Optional: Add HF token for higher rate limits if available
+            ...(process.env.HUGGINGFACE_TOKEN && { 
+              "Authorization": `Bearer ${process.env.HUGGINGFACE_TOKEN}` 
+            }),
+          },
+          method: "POST",
+          body: JSON.stringify({
+            inputs: prompt,
+            options: { wait_for_model: true }
+          }),
+        }
+      );
 
-      if (!response.data || response.data.length === 0) {
-        throw new Error("No image data returned from DALL-E");
+      console.log("[HF DEBUG] Response status:", response.status);
+      console.log("[HF DEBUG] Response headers:", Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        if (response.status === 503) {
+          return {
+            url: "",
+            success: false,
+            error: "The AI model is loading. Please try again in a few seconds."
+          };
+        }
+        
+        const errorText = await response.text();
+        console.error("[HF DEBUG] Full API error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText,
+          url: "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+        });
+        return {
+          url: "",
+          success: false,
+          error: `Image generation failed: ${response.status} ${errorText || 'Server error'}`
+        };
       }
 
-      const imageUrl = response.data[0]?.url;
-      if (!imageUrl) {
-        throw new Error("No image URL returned from DALL-E");
-      }
+      // Get the image data as blob
+      const imageBlob = await response.blob();
+      
+      // Convert blob to base64 data URL for immediate use
+      const arrayBuffer = await imageBlob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64Image = buffer.toString('base64');
+      const dataUrl = `data:image/png;base64,${base64Image}`;
 
-      console.log("Successfully generated image:", imageUrl);
+      console.log("[HF DEBUG] Successfully generated image, size:", buffer.length, "bytes");
       return {
-        url: imageUrl,
+        url: dataUrl,
         success: true
       };
     } catch (error: any) {
-      console.error("Error generating image with DALL-E:", error);
+      console.error("Error generating image with Hugging Face:", error);
       
-      // Handle specific OpenAI errors
-      if (error.code === 'content_policy_violation') {
+      // Handle network and other errors
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
         return {
           url: "",
           success: false,
-          error: "Content policy violation: The prompt contains content that violates OpenAI's usage policies. Please try a different prompt."
-        };
-      }
-      
-      if (error.code === 'rate_limit_exceeded') {
-        return {
-          url: "",
-          success: false,
-          error: "Rate limit exceeded: Too many requests. Please try again in a moment."
+          error: "Request timed out. Please try again with a shorter prompt."
         };
       }
       
