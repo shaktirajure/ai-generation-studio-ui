@@ -11,15 +11,16 @@ import crypto from "crypto";
 const DEMO_USER_ID = "demo-user";
 const DEMO_SESSION_ID = "demo-session";
 
-// Rate limiting middleware
+// Rate limiting middleware for mutating operations only
 const generalRateLimit = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 10, // 10 requests per minute per IP
-  message: { error: "Too many requests, please try again later" }
+  message: { error: "Too many requests, please try again later" },
+  skip: (req) => req.method === "HEAD" || req.method === "GET" // Skip rate limiting for read operations
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Apply rate limiting to write routes
+  // Apply rate limiting to write routes only
   app.use("/api", generalRateLimit);
 
   // Get user credits
@@ -188,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       while (attempts < maxAttempts) {
         const updatedJob = await JobService.getJob(job.id);
         
-        if (updatedJob?.status === "completed" && updatedJob.assetUrls) {
+        if (updatedJob?.status === "completed" && updatedJob.assetUrls && Array.isArray(updatedJob.assetUrls) && updatedJob.assetUrls.length > 0) {
           // Get updated credits
           const { db } = await import("./db");
           const { users } = await import("@shared/schema");
@@ -212,9 +213,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (updatedJob?.status === "failed") {
+          const errorMessage = typeof updatedJob.meta === 'object' && updatedJob.meta && 'error' in updatedJob.meta 
+            ? String(updatedJob.meta.error) 
+            : "Unknown error";
           return res.status(422).json({
             error: "Generation failed",
-            message: updatedJob.meta?.error || "Unknown error"
+            message: errorMessage
           });
         }
 
@@ -330,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const job = await JobService.getJob(id);
 
-      if (!job || !job.assetUrls || job.assetUrls.length === 0) {
+      if (!job || !job.assetUrls || !Array.isArray(job.assetUrls) || job.assetUrls.length === 0) {
         return res.status(404).json({ error: "Asset not found" });
       }
 

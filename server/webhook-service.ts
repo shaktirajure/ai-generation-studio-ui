@@ -21,15 +21,19 @@ export class WebhookService {
   static verifySignature(payload: string, signature: string): boolean {
     if (!signature) return false;
 
-    const expectedSignature = crypto
+    const expectedSignature = `sha256=${crypto
       .createHmac("sha256", this.WEBHOOK_SECRET)
       .update(payload)
-      .digest("hex");
+      .digest("hex")}`;
 
-    // Compare signatures safely to prevent timing attacks
+    // Compare signatures safely with length guard to prevent timing attacks
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+
     return crypto.timingSafeEqual(
       Buffer.from(signature),
-      Buffer.from(`sha256=${expectedSignature}`)
+      Buffer.from(expectedSignature)
     );
   }
 

@@ -2,7 +2,7 @@
 
 import { db } from "./db";
 import { jobs, toolCosts, toolSchema, type Tool, type Job, sessions, users } from "@shared/schema";
-import { eq, and, gt, desc } from "drizzle-orm";
+import { eq, and, gt, desc, sql } from "drizzle-orm";
 import { ProviderFactory } from "./providers/provider-factory";
 import type { 
   TextToImageRequest, 
@@ -94,17 +94,32 @@ export class JobService {
         .where(eq(users.id, userId));
     });
 
-    // Create job record
-    const [job] = await db.insert(jobs).values({
-      tool,
-      prompt,
-      inputs: inputs || null,
-      status: "queued",
-      userId,
-      sessionId,
-      creditsUsed: cost,
-      provider: this.getProviderName(tool),
-    }).returning();
+    // Create job record and update heavy job counter if needed
+    const [job] = await db.transaction(async (tx) => {
+      const [newJob] = await tx.insert(jobs).values({
+        tool,
+        prompt,
+        inputs: inputs || null,
+        status: "queued",
+        userId,
+        sessionId,
+        creditsUsed: cost,
+        provider: this.getProviderName(tool),
+      }).returning();
+
+      // Update heavy job counter for rate limiting
+      const heavyJobs: Tool[] = ["text2mesh", "texturing", "img2video"];
+      if (heavyJobs.includes(tool)) {
+        await tx.update(sessions)
+          .set({ 
+            heavyJobsThisHour: sql`${sessions.heavyJobsThisHour} + 1`,
+            lastHeavyJobAt: new Date()
+          })
+          .where(and(eq(sessions.userId, userId), eq(sessions.id, sessionId)));
+      }
+
+      return newJob;
+    });
 
     // Start the job asynchronously
     this.startJob(job.id).catch(console.error);
