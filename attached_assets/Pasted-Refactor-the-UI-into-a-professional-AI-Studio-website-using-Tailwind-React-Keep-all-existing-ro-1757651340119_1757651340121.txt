@@ -1,0 +1,63 @@
+Refactor the UI into a professional “AI Studio” website using Tailwind + React.
+Keep all existing routes and API calls working. Do NOT remove features. Just rebuild the visual layer and page structure.
+
+Global style:
+- Design system: use Tailwind + CSS variables. Brand colors:
+  --bg: #0B0F1A; --panel: rgba(255,255,255,0.04); --muted: #8A93A6;
+  --primary: #7C3AED; --primary-2: #22D3EE; --accent: #F59E0B; --success: #22C55E; --danger: #EF4444.
+- Typography: Inter for UI, **Sora** for headings. h1-h3 bold with tight leading.
+- Layout: max-w-7xl centered, generous spacing (py-16), 12/24 grid on desktop.
+- Theme: dark by default with theme toggle; support light mode automatically.
+
+Components (create under client/src/components/ui):
+- <StudioNavbar />: sticky top, translucent blur (backdrop-blur-xl), logo mark, nav links (Home, Generate, Assets, API, Pricing, Docs), CTA button “Launch Studio”.
+- <Footer />: 4-column footer with logo, quick links, social icons (lucide-react), copyright.
+- <SectionTitle />: eyebrow (uppercase), title, description; centered by default.
+- <GlassCard />: rounded-2xl, border border-white/10, bg-white/5, hover:border-white/20, subtle shadow and scale on hover.
+- <Badge /> variants: “Beta”, “Webhook live”, “PWA”.
+- <Button /> variants: primary (gradient from --primary to --primary-2), outline, ghost.
+- <Stat /> for key metrics.
+- <CodeBlock /> for API examples (copy button).
+
+Page redesigns:
+
+1) Home (new hero + sections)
+- Hero: split layout. Left: headline “Create, texture & publish 3D with AI”, subcopy, primary CTA (“Launch Studio”), secondary (“View API”). Right: animated 3D preview panel (placeholder <canvas> with gently animated gradient blobs; do NOT add heavy three.js right now).
+- Trust bar: grayscale logos (placeholders).
+- Features: 3 GlassCards in a 3-col grid (Text→3D, Image→3D, AI Texturing) each with icon, short copy.
+- Workflow: 3 steps with arrows: Prompt → Webhook → Preview & Download.
+- Showcase: masonry of 6 assets (use your job data if present; else placeholders).
+- CTA band: gradient panel with big button.
+- Footer.
+
+2) Generate
+- Two-column layout. Left: GlassCard “New Generation” with tabs (Text→3D, Image→3D). Fields: prompt textarea, optional image URL, style presets (chips), webhook toggle status (if SIMULATE_WEBHOOKS true show <Badge variant="success">Webhooks: live</Badge>), “Cost: 1 credit”.
+- Right: “Output” panel. While pending show skeletons + shimmer. When done, show 3D viewer placeholder + download button + JSON metadata (collapsible).
+- Disable submit if credits = 0; show link to Admin.
+
+3) Assets
+- Toolbar (search, filters, view toggle). Grid of GlassCards with thumb, type pill, created_at, “Open” button. Empty state illustration.
+- Clicking asset opens Drawer/Modal with larger preview and download.
+
+4) API Playground
+- Two-panels: left Tabs (REST, Webhooks) with <CodeBlock> examples; right Console area to make test calls and see responses; tiny indicator for signature verification status.
+
+5) Admin
+- Simple card: session_id input (prefilled), amount, grant button; show toasts. Guard with x-admin-password.
+
+6) Webhook Debug
+- Table inside GlassCard: event id, job id, status, when; filter by result; copy raw JSON.
+
+Interactions & polish:
+- Subtle framer-motion on section entrances and card hover (opacity, y translate).
+- Gradients: hero backdrop radial-gradient via tailwind utilities; buttons use bg-[linear-gradient(...)].
+- PWA: keep manifest + service worker; show “Install App” button in navbar if deferred prompt available.
+- Accessibility: focus rings, aria labels, prefers-reduced-motion.
+- Mobile: stacked cards; hide heavy effects; bottom nav CTA.
+
+Implementation details:
+- Create components, refactor pages to use them.
+- Add a Tailwind plugin layer for “glass” class, gradient text, and utilities.
+- Ensure no breaking changes to existing fetch calls, routes, or credit logic.
+- Keep color tokens in :root and data-theme=light overrides.
+- After changes, update README screenshots and short “Design System” section.
