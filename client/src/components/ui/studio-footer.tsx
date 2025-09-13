@@ -13,31 +13,31 @@ export default function StudioFooter() {
   ];
   
   const resources = [
-    { href: "#", label: "Documentation" },
-    { href: "#", label: "API Reference" },
-    { href: "#", label: "Pricing" },
-    { href: "#", label: "Changelog" },
+    { href: "#documentation", label: "Documentation" },
+    { href: "#api-reference", label: "API Reference" },
+    { href: "#pricing", label: "Pricing" },
+    { href: "#changelog", label: "Changelog" },
   ];
   
   const company = [
-    { href: "#", label: "About" },
-    { href: "#", label: "Blog" },
-    { href: "#", label: "Careers" },
-    { href: "#", label: "Contact" },
+    { href: "#about", label: "About" },
+    { href: "#blog", label: "Blog" },
+    { href: "#careers", label: "Careers" },
+    { href: "#contact", label: "Contact" },
   ];
   
   const legal = [
-    { href: "#", label: "Privacy Policy" },
-    { href: "#", label: "Terms of Service" },
-    { href: "#", label: "Cookie Policy" },
-    { href: "#", label: "GDPR" },
+    { href: "#privacy", label: "Privacy Policy" },
+    { href: "#terms", label: "Terms of Service" },
+    { href: "#cookies", label: "Cookie Policy" },
+    { href: "#gdpr", label: "GDPR" },
   ];
   
   const socialLinks = [
-    { icon: Twitter, href: "#", label: "Twitter" },
-    { icon: Github, href: "#", label: "GitHub" },
-    { icon: Linkedin, href: "#", label: "LinkedIn" },
-    { icon: Mail, href: "#", label: "Email" },
+    { icon: Twitter, href: "#twitter", label: "Twitter" },
+    { icon: Github, href: "#github", label: "GitHub" },
+    { icon: Linkedin, href: "#linkedin", label: "LinkedIn" },
+    { icon: Mail, href: "#email", label: "Email" },
   ];
 
   return (

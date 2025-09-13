@@ -13,6 +13,16 @@ import {
   Eye,
   RotateCcw
 } from "lucide-react";
+import "@google/model-viewer";
+
+// Declare model-viewer for TypeScript
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'model-viewer': any;
+    }
+  }
+}
 
 interface JobStatusProps {
   jobId: string | null;
@@ -33,7 +43,8 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
     enabled: !!jobId,
     refetchInterval: (data) => {
       // Stop polling when job is completed or failed
-      return data?.status === "completed" || data?.status === "failed" ? false : 2000;
+      if (!data) return 2000;
+      return data.status === "completed" || data.status === "failed" ? false : 2000;
     }
   });
 
@@ -140,10 +151,43 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
 
     if (job.tool === "text2mesh") {
       return (
-        <div className="mt-4 p-4 bg-black/20 rounded-lg text-center">
-          <div className="text-white/60 mb-2">3D Model Generated</div>
-          <div className="text-sm text-white/40">
-            Click "View 3D" to open in 3D viewer
+        <div className="mt-4 space-y-4">
+          <div className="text-white/60 mb-2">
+            {job.previewImage ? "3D Model + Image Preview Generated" : "3D Model Generated"}
+          </div>
+          
+          {/* Image Preview */}
+          {job.previewImage && (
+            <div>
+              <div className="text-white/40 text-sm mb-2">Image Preview:</div>
+              <div className="h-48 bg-black/20 rounded-lg overflow-hidden">
+                <img 
+                  src={job.previewImage}
+                  alt={`Preview of ${job.prompt}`}
+                  className="w-full h-full object-cover"
+                  data-testid="preview-image"
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* 3D Model */}
+          <div>
+            <div className="text-white/40 text-sm mb-2">3D Model:</div>
+            <div className="h-64 bg-black/20 rounded-lg relative overflow-hidden">
+              <model-viewer
+                src={firstAsset}
+                alt="Generated 3D model"
+                auto-rotate
+                camera-controls
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.1)'
+                }}
+                data-testid="model-viewer"
+              />
+            </div>
           </div>
         </div>
       );
@@ -253,6 +297,13 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
                 <Button
                   variant="outline"
                   className="flex-1"
+                  onClick={() => {
+                    // Scroll to the 3D model preview
+                    const modelViewer = document.querySelector('[data-testid="model-viewer"]');
+                    if (modelViewer) {
+                      modelViewer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }}
                   data-testid="button-view-3d"
                 >
                   <Eye className="h-4 w-4 mr-2" />

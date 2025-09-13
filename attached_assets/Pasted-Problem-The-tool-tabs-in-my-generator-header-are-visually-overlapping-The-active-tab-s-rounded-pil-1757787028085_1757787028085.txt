@@ -1,0 +1,45 @@
+Problem
+The tool tabs in my generator header are visually overlapping. The active tab’s rounded “pill” background bleeds over adjacent tabs, and the icon/title/badge inside each tab look cramped and sometimes overlap. See `client/src/components/ui/studio-tabs.tsx`. I am using shadcn/ui Tabs and Tailwind.
+
+Root causes to fix
+1) The active-state background (from shadcn Tabs styles) is rendering like a wide overlay that extends beyond its tab and covers neighbors.
+2) The inner content (icon ➜ title ➜ credits badge) has insufficient vertical spacing/height.
+3) Badges and icons don’t have a clear stacking context, so they can get covered by the active “pill”.
+
+What I need you to do
+A) Constrain the active “pill” to the current tab only
+- In `studio-tabs.tsx`, for the `<TabsTrigger>` element, add a wrapper that isolates the highlight:
+  - Add `isolate relative overflow-hidden` to the trigger so any pseudo-element/highlight stays inside it.
+  - Ensure we are not using any global CSS that adds a full-width `::before/::after` highlight across the whole TabsList. If present, scope/remove it so the active highlight only applies to the active trigger.
+- If shadcn’s base Tabs styles add a selection underline or background on the list, disable it on `<TabsList>` (e.g., remove/override `before:` or `after:` rules there).
+
+B) Give each tab enough height and spacing so content never overlaps
+- In the `<TabsTrigger>` classes:
+  - Set a taller minimum height: `min-h-[168px]` (increase if needed).
+  - Use a column layout with spacing: `flex flex-col justify-between items-center gap-3`.
+  - Keep the trigger narrow enough so four tabs fit in a row on desktop: `min-w-[150px] max-w-[190px] text-center`.
+  - Active state stays within the trigger: `data-[state=active]:bg-white/10 data-[state=active]:text-white`.
+- For the inner content container (the `<div>` that wraps Icon/Title/Badge), use:
+  - `flex flex-col items-center justify-between h-full w-full py-2`
+  - Put the Icon at the top with `className="h-8 w-8 shrink-0"`
+  - Title `<span>`: `text-xs font-medium leading-tight whitespace-normal break-words px-2`
+  - Badge goes at the bottom: place it in a `div` with `mt-auto` and give the badge `text-[10px] px-2 py-0.5 rounded-full`.
+- Add `z-10` on the content container so it always appears above any active background overlay.
+
+C) Prevent Tabs from crowding / colliding across breakpoints
+- On `<TabsList>`, ensure spacing and wrapping:
+  - `className="flex w-full flex-wrap justify-center items-stretch gap-6 sm:gap-8 lg:gap-12 p-6 md:p-8 mb-8 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg"`
+- Each `<TabsTrigger>` should be a *real* flex item, not absolutely positioned. No `position: absolute` on triggers.
+- Make sure hover/active focus rings don’t extend beyond the trigger: `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50`.
+
+D) Acceptance criteria
+- The active tab’s rounded background (“pill”) is confined to that trigger only; it never overlaps adjacent tabs.
+- Icon, title, and credits badge are vertically stacked with clear spacing; no clipping on any screen width.
+- 4 tabs fit side-by-side at desktop widths without colliding; on smaller screens, the triggers wrap to a new row cleanly.
+- Clicking any tab still switches content correctly.
+
+Where to change
+- Most changes go in `client/src/components/ui/studio-tabs.tsx`.
+- If there are global styles altering `.tabs` or shadcn Tabs pseudo-elements (e.g., in a CSS file or Tailwind layer), adjust/override them so the selection/active highlight is per-trigger, not per-list.
+
+Make these updates and show me the diff to confirm. The UI should match the acceptance criteria above.

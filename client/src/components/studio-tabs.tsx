@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,12 @@ interface StudioTabsProps {
 
 export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
   const [activeTab, setActiveTab] = useState("text2image");
+  const [customizations, setCustomizations] = useState({
+    style: "",
+    color: "",
+    material: "",
+    quality: "standard"
+  });
   const [prompts, setPrompts] = useState({
     text2image: "",
     text2mesh: "",
@@ -144,6 +151,18 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
         imageUrl: "https://example.com/uploaded-image.jpg",
         options: { duration: 5, fps: 24 }
       };
+    } else if (tool === "text2mesh") {
+      // Enhanced Text to 3D with customizations
+      inputs = {
+        options: {
+          customizations: {
+            style: customizations.style || undefined,
+            color: customizations.color || undefined,
+            material: customizations.material || undefined,
+            quality: customizations.quality || "standard"
+          }
+        }
+      };
     }
 
     createJobMutation.mutate({ tool, prompt, inputs });
@@ -165,7 +184,7 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex w-full justify-center items-stretch gap-6 sm:gap-8 lg:gap-12 p-8 mb-8 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 p-4 mb-8 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg relative z-20">
           {Object.entries(toolInfo).map(([key, info]) => {
             const Icon = info.icon;
             const cost = toolCosts[key as keyof typeof toolCosts];
@@ -175,18 +194,22 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
               <TabsTrigger
                 key={key}
                 value={key}
-                className="flex flex-col items-center justify-center gap-3 px-6 py-6 flex-1 min-h-[140px] min-w-[140px] max-w-[180px] text-center text-white/70 data-[state=active]:text-white data-[state=active]:bg-white/10 hover:bg-white/5 transition-all rounded-lg border-0 relative"
+                className="isolate relative overflow-hidden flex flex-col justify-between items-center gap-2 min-h-[140px] text-center data-[state=active]:bg-white/10 data-[state=active]:text-white hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all rounded-lg border-0"
                 data-testid={`tab-${key}`}
               >
-                <div className="flex flex-col items-center justify-center w-full h-full space-y-3 py-2">
-                  <Icon className="h-8 w-8 flex-shrink-0" />
-                  <span className="text-xs font-medium leading-tight text-center whitespace-nowrap px-1">{info.title}</span>
-                  <Badge 
-                    variant={affordable ? "secondary" : "destructive"} 
-                    className="text-[9px] px-2 py-1 rounded-full flex-shrink-0"
-                  >
-                    {cost} credit{cost !== 1 ? 's' : ''}
-                  </Badge>
+                <div className="flex flex-col items-center justify-between h-full w-full py-3 px-2 z-10">
+                  <Icon className="h-6 w-6 shrink-0" />
+                  <span className="text-xs font-medium leading-tight text-center px-1">
+                    {info.title}
+                  </span>
+                  <div className="mt-auto">
+                    <Badge 
+                      variant={affordable ? "secondary" : "destructive"} 
+                      className="text-[9px] px-1.5 py-0.5 rounded-full"
+                    >
+                      {cost} credit{cost !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
                 </div>
               </TabsTrigger>
             );
@@ -201,10 +224,17 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
           const needsFileUpload = tool === "texturing" || tool === "img2video";
 
           return (
-            <TabsContent key={key} value={key} className="mt-8">
+            <TabsContent 
+              key={key} 
+              value={key} 
+              className={cn(
+                "mt-8 relative z-0",
+                activeTab === key ? "block" : "hidden"
+              )}
+            >
               <Card className="bg-black/20 backdrop-blur-sm border border-white/10">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
+                <CardHeader className="pointer-events-none">
+                  <CardTitle className="flex items-center gap-3 pointer-events-none">
                     <Icon className="h-6 w-6 text-blue-400" />
                     <div>
                       <div className="text-xl text-white">{info.title}</div>
@@ -262,6 +292,79 @@ export function StudioTabs({ userCredits, onJobCreated }: StudioTabsProps) {
                       data-testid={`input-prompt-${tool}`}
                     />
                   </div>
+
+                  {/* Enhanced Text to 3D Customization Controls */}
+                  {tool === "text2mesh" && (
+                    <div className="space-y-4 border-t border-white/10 pt-4">
+                      <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                        <Palette className="h-4 w-4" />
+                        Customization Options
+                      </h4>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Style Selection */}
+                        <div className="space-y-2">
+                          <Label className="text-white text-xs">Style</Label>
+                          <select 
+                            className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+                            onChange={(e) => setCustomizations(prev => ({ ...prev, style: e.target.value }))}
+                          >
+                            <option value="">Default</option>
+                            <option value="realistic">Realistic</option>
+                            <option value="cartoon">Cartoon</option>
+                            <option value="low-poly">Low Poly</option>
+                            <option value="cyberpunk">Cyberpunk</option>
+                            <option value="medieval">Medieval</option>
+                          </select>
+                        </div>
+
+                        {/* Color Scheme */}
+                        <div className="space-y-2">
+                          <Label className="text-white text-xs">Color Scheme</Label>
+                          <select 
+                            className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+                            onChange={(e) => setCustomizations(prev => ({ ...prev, color: e.target.value }))}
+                          >
+                            <option value="">Default</option>
+                            <option value="vibrant">Vibrant</option>
+                            <option value="pastel">Pastel</option>
+                            <option value="monochrome">Monochrome</option>
+                            <option value="neon">Neon</option>
+                            <option value="earth-tones">Earth Tones</option>
+                          </select>
+                        </div>
+
+                        {/* Material Type */}
+                        <div className="space-y-2">
+                          <Label className="text-white text-xs">Material</Label>
+                          <select 
+                            className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+                            onChange={(e) => setCustomizations(prev => ({ ...prev, material: e.target.value }))}
+                          >
+                            <option value="">Default</option>
+                            <option value="metal">Metal</option>
+                            <option value="plastic">Plastic</option>
+                            <option value="wood">Wood</option>
+                            <option value="glass">Glass</option>
+                            <option value="fabric">Fabric</option>
+                          </select>
+                        </div>
+
+                        {/* Quality Level */}
+                        <div className="space-y-2">
+                          <Label className="text-white text-xs">Quality</Label>
+                          <select 
+                            className="w-full bg-white/5 border border-white/10 text-white rounded px-2 py-1 text-sm"
+                            onChange={(e) => setCustomizations(prev => ({ ...prev, quality: e.target.value }))}
+                          >
+                            <option value="standard">Standard</option>
+                            <option value="high">High Detail</option>
+                            <option value="ultra">Ultra Detail</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Additional options for some tools */}
                   {tool === "img2video" && (

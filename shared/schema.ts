@@ -26,6 +26,7 @@ export const jobs = pgTable("jobs", {
   inputs: jsonb("inputs"), // For file uploads, images, models
   status: text("status").notNull().default("queued"), // "queued" | "processing" | "completed" | "failed"
   assetUrls: jsonb("asset_urls"), // Array of URLs for multi-asset results
+  previewImage: text("preview_image"), // For image preview alongside 3D models
   provider: text("provider"), // "SIM" | "MESHY" | "REPLICATE"
   providerJobId: text("provider_job_id"), // External job ID for tracking
   meta: jsonb("meta"), // Additional metadata

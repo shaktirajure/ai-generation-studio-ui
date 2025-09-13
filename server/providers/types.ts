@@ -5,6 +5,7 @@ export interface ProviderJob {
   status: "queued" | "processing" | "completed" | "failed";
   result?: {
     assetUrls: string[];
+    previewImage?: string; // For image preview alongside 3D models
     meta?: Record<string, any>;
   };
   error?: string;
@@ -24,6 +25,12 @@ export interface TextTo3DRequest {
   options?: {
     style?: string;
     quality?: "draft" | "standard" | "high";
+    customizations?: {
+      style?: string;
+      color?: string;
+      material?: string;
+      quality?: string;
+    };
   };
 }
 

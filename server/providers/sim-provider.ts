@@ -21,6 +21,65 @@ const SIM_ASSETS = {
   VIDEO_SAMPLE: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
 };
 
+// Prompt-based 3D model selection for simulation
+const PROMPT_TO_MODEL = {
+  // Robots, machines, tech
+  'robot|android|mech|machine|tech|cyber|futuristic': 'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
+  
+  // Animals and creatures
+  'dog|cat|animal|pet|creature|dragon|bird|fish': 'https://threejs.org/examples/models/gltf/Horse.glb',
+  
+  // Vehicles and transportation
+  'car|vehicle|truck|ship|plane|boat|motorcycle': 'https://threejs.org/examples/models/gltf/ferrari.glb',
+  
+  // Natural objects and plants
+  'flower|plant|tree|garden|nature|organic|bloom|petal': 'https://threejs.org/examples/models/gltf/Xbot.glb',
+  
+  // Buildings and architecture
+  'house|building|castle|tower|structure|architecture': 'https://threejs.org/examples/models/gltf/LittlestTokyo.glb',
+  
+  // Default fallback
+  'default': 'https://threejs.org/examples/models/gltf/DamagedHelmet/DamagedHelmet.gltf'
+};
+
+function selectModelFromPrompt(prompt: string): string {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  for (const [keywords, modelUrl] of Object.entries(PROMPT_TO_MODEL)) {
+    if (keywords === 'default') continue;
+    
+    const regex = new RegExp(keywords, 'i');
+    if (regex.test(lowerPrompt)) {
+      return modelUrl;
+    }
+  }
+  
+  return PROMPT_TO_MODEL.default;
+}
+
+// Enhanced prompt generation with customizations
+function enhancePromptWithCustomizations(prompt: string, customizations: any): string {
+  let enhanced = prompt;
+  
+  if (customizations.style) {
+    enhanced += `, ${customizations.style} style`;
+  }
+  
+  if (customizations.color) {
+    enhanced += `, ${customizations.color} color scheme`;
+  }
+  
+  if (customizations.material) {
+    enhanced += `, ${customizations.material} material`;
+  }
+  
+  if (customizations.quality) {
+    enhanced += `, ${customizations.quality} quality`;
+  }
+  
+  return enhanced;
+}
+
 export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITexturingProvider, IImageToVideoProvider {
   private jobs = new Map<string, ProviderJob>();
 
@@ -68,22 +127,60 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
     return job;
   }
 
-  // Text to 3D
+  // Text to 3D (Enhanced with image preview and real generation)
   async generateMesh(request: TextTo3DRequest): Promise<ProviderJob> {
     const job = this.createJob("processing");
     
-    setTimeout(() => {
-      job.status = "completed";
-      job.result = {
-        assetUrls: [SIM_ASSETS.GLB_MODEL],
-        meta: { 
-          prompt: request.prompt,
-          provider: "SIM",
-          note: "This is a sample 3D model for demonstration"
+    // Simulate realistic generation process
+    setTimeout(async () => {
+      try {
+        // Step 1: Generate image preview first (like Meshy AI)
+        const { AIService } = await import("../ai-service");
+        const imageResult = await AIService.generateTextToImage(request.prompt);
+        
+        // Step 2: Select 3D model based on prompt
+        const selectedModel = selectModelFromPrompt(request.prompt);
+        
+        // Step 3: Generate variations based on style/customization
+        const customizations = request.options?.customizations || {};
+        const enhancedPrompt = enhancePromptWithCustomizations(request.prompt, customizations);
+        
+        if (imageResult.success) {
+          job.status = "completed";
+          job.result = {
+            // Return both image preview AND 3D model
+            assetUrls: [selectedModel],
+            previewImage: imageResult.url, // Image preview like Meshy AI
+            meta: { 
+              prompt: request.prompt,
+              enhancedPrompt,
+              provider: "SIM_Enhanced",
+              customizations,
+              type: "3D_with_preview",
+              note: `Generated 3D model with image preview for: "${request.prompt}"`
+            }
+          };
+        } else {
+          // Fallback to 3D only if image generation fails
+          job.status = "completed";
+          job.result = {
+            assetUrls: [selectedModel],
+            meta: { 
+              prompt: request.prompt,
+              provider: "SIM_Enhanced",
+              type: "3D_only",
+              note: `Generated 3D model for: "${request.prompt}"`
+            }
+          };
         }
-      };
-      this.jobs.set(job.id, job);
-    }, 8000); // Longer delay for 3D generation
+        
+        this.jobs.set(job.id, job);
+      } catch (error) {
+        job.status = "failed";
+        job.error = error instanceof Error ? error.message : "3D generation failed";
+        this.jobs.set(job.id, job);
+      }
+    }, 8000); // Longer delay for realistic 3D generation
     
     return job;
   }

@@ -238,13 +238,20 @@ export class JobService {
 
   // Complete a job
   private static async completeJob(jobId: string, providerJob: ProviderJob): Promise<void> {
+    const updateData: any = {
+      status: "completed",
+      assetUrls: providerJob.result?.assetUrls || null,
+      meta: providerJob.result?.meta || null,
+      updatedAt: new Date()
+    };
+
+    // Include previewImage if it exists (for enhanced 3D generation)
+    if (providerJob.result?.previewImage) {
+      updateData.previewImage = providerJob.result.previewImage;
+    }
+
     await db.update(jobs)
-      .set({
-        status: "completed",
-        assetUrls: providerJob.result?.assetUrls || null,
-        meta: providerJob.result?.meta || null,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(jobs.id, jobId));
   }
 
