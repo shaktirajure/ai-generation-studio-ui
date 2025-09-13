@@ -174,19 +174,36 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
           {/* 3D Model */}
           <div>
             <div className="text-white/40 text-sm mb-2">3D Model:</div>
-            <div className="h-64 bg-black/20 rounded-lg relative overflow-hidden">
-              <model-viewer
-                src={firstAsset}
-                alt="Generated 3D model"
-                auto-rotate
-                camera-controls
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: 'rgba(0, 0, 0, 0.1)'
-                }}
-                data-testid="model-viewer"
-              />
+            <div className="h-64 bg-black/20 rounded-lg relative overflow-hidden flex items-center justify-center">
+              {firstAsset ? (
+                <model-viewer
+                  src={firstAsset}
+                  alt="Generated 3D model"
+                  auto-rotate
+                  camera-controls
+                  disable-zoom
+                  ar="false"
+                  xr-environment="false"
+                  loading="lazy"
+                  reveal="interaction"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'transparent'
+                  }}
+                  data-testid="model-viewer"
+                  onError={(e: any) => {
+                    console.warn('Model viewer error (suppressed):', e);
+                    if (e && e.stopPropagation) e.stopPropagation();
+                    if (e && e.preventDefault) e.preventDefault();
+                    return false;
+                  }}
+                />
+              ) : (
+                <div className="text-white/40 text-sm">
+                  Loading 3D model...
+                </div>
+              )}
             </div>
           </div>
         </div>
