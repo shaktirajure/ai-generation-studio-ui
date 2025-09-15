@@ -354,7 +354,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.send(buffer);
       }
 
-      // For regular URLs, redirect to the asset
+      // Handle local file paths (starts with /uploads/)
+      if (assetUrl.startsWith("/uploads/")) {
+        // Serve the local file directly
+        const path = await import('path');
+        const filePath = path.join(process.cwd(), assetUrl);
+        
+        // Set appropriate headers for download
+        const extension = path.extname(assetUrl).toLowerCase();
+        const mimeType = extension === '.glb' ? 'model/gltf-binary' : 
+                        extension === '.gltf' ? 'model/gltf+json' : 
+                        'application/octet-stream';
+        
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="generated-${id}${extension}"`);
+        
+        // Use sendFile for efficient file serving
+        return res.sendFile(filePath, (err) => {
+          if (err) {
+            console.error('Error serving local file:', err);
+            res.status(404).json({ error: 'File not found' });
+          }
+        });
+      }
+
+      // For external URLs, redirect to the asset
       res.redirect(assetUrl);
 
     } catch (error) {

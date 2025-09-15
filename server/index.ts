@@ -38,6 +38,25 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Set up development environment variables for comprehensive Text→3D system
+  if (!process.env.BASE_URL) {
+    process.env.BASE_URL = 'http://localhost:5000';
+  }
+  if (!process.env.WEBHOOK_SECRET) {
+    process.env.WEBHOOK_SECRET = 'development-webhook-secret-key';
+  }
+  if (!process.env.SIMULATE_WEBHOOKS) {
+    process.env.SIMULATE_WEBHOOKS = 'true';
+  }
+  if (!process.env.PROVIDER_3D) {
+    process.env.PROVIDER_3D = 'SIM';
+  }
+  
+  console.log('[ENV] Development environment configured:');
+  console.log(`[ENV] BASE_URL: ${process.env.BASE_URL}`);
+  console.log(`[ENV] PROVIDER_3D: ${process.env.PROVIDER_3D}`);
+  console.log(`[ENV] SIMULATE_WEBHOOKS: ${process.env.SIMULATE_WEBHOOKS}`);
+  
   // Set up static file serving with proper MIME types for 3D models
   setupStaticFiles(app);
   

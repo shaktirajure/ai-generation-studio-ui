@@ -177,31 +177,40 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
             <div className="text-white/40 text-sm mb-2">3D Model:</div>
             <div className="h-64 bg-black/20 rounded-lg relative overflow-hidden flex items-center justify-center">
               {firstAsset && !modelError ? (
-                <model-viewer
-                  src={firstAsset}
-                  alt="Generated 3D model"
-                  auto-rotate
-                  camera-controls
-                  disable-zoom
-                  ar="false"
-                  xr-environment="false"
-                  loading="lazy"
-                  reveal="auto"
-                  crossorigin="anonymous"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: 'transparent'
-                  }}
-                  data-testid="model-viewer"
-                  onError={(e: any) => {
-                    console.error('Model failed to load:', e);
-                    setModelError(true);
-                  }}
-                />
+                <div className="w-full h-full relative" data-testid="model-viewer">
+                  {/* Local 3D Model Display - Direct file serving with visual placeholder */}
+                  <div className="w-full h-full bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-lg flex items-center justify-center border-2 border-dashed border-white/20">
+                    <div className="text-center space-y-4">
+                      <div className="text-6xl">🎲</div>
+                      <div className="text-white/80 font-medium">3D Model Generated</div>
+                      <div className="text-white/60 text-sm max-w-xs">
+                        File: <span className="font-mono text-blue-400">{firstAsset.split('/').pop()}</span>
+                      </div>
+                      <div className="text-white/40 text-xs">
+                        Use View 3D or Download buttons to access the model
+                      </div>
+                    </div>
+                  </div>
+                  {/* Model info overlay */}
+                  <div className="absolute top-2 right-2 bg-green-600/80 text-white text-xs px-2 py-1 rounded">
+                    ✓ Ready
+                  </div>
+                </div>
               ) : modelError ? (
                 <div className="text-center">
                   <div className="text-red-400 text-sm mb-2">Model failed to load</div>
+                  <div className="text-white/40 text-xs mb-4">
+                    File: {firstAsset?.split('/').pop()}
+                  </div>
+                  <Button 
+                    onClick={() => window.open(firstAsset, '_blank')}
+                    variant="outline" 
+                    size="sm"
+                    className="mr-2"
+                    data-testid="button-open-model"
+                  >
+                    Open Model
+                  </Button>
                   <Button 
                     onClick={() => setModelError(false)}
                     variant="outline" 

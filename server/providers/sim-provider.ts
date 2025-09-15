@@ -179,12 +179,21 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
           console.log(`[SIM DEBUG] Text2Mesh job ${job.id} completed with model only: ${selectedModel}`);
         }
         
-        this.jobs.set(job.id, job);
-        
-        // Simulate webhook delivery if enabled
+        // Simulate webhook delivery with file download if enabled
+        console.log(`[SIM DEBUG] About to simulate webhook for job ${job.id}, SIMULATE_WEBHOOKS=${process.env.SIMULATE_WEBHOOKS}`);
         if (process.env.SIMULATE_WEBHOOKS === 'true') {
-          await this.simulateWebhookWithFileDownload(job.id, job.result);
+          console.log(`[SIM DEBUG] Original job.result.assetUrls: ${JSON.stringify(job.result?.assetUrls)}`);
+          const updatedResult = await this.simulateWebhookWithFileDownload(job.id, job.result);
+          if (updatedResult) {
+            // Update the job with the new result that has local file paths
+            console.log(`[SIM DEBUG] Updated result.assetUrls: ${JSON.stringify(updatedResult.assetUrls)}`);
+            job.result = updatedResult;
+          } else {
+            console.log(`[SIM DEBUG] No updated result returned from webhook simulation`);
+          }
         }
+        
+        this.jobs.set(job.id, job);
       } catch (error) {
         job.status = "failed";
         job.error = error instanceof Error ? error.message : "3D generation failed";
@@ -255,7 +264,7 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
   }
 
   // Simulate webhook with file download for comprehensive testing
-  private async simulateWebhookWithFileDownload(jobId: string, result: any): Promise<void> {
+  private async simulateWebhookWithFileDownload(jobId: string, result: any): Promise<any> {
     const baseUrl = process.env.BASE_URL;
     if (!baseUrl) {
       console.log('[SIM] No BASE_URL configured, skipping webhook simulation');
@@ -304,8 +313,12 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
 
       console.log(`[SIM] Sent webhook for job ${jobId} with local file`);
       
+      // Return the updated result so the calling code can update the job
+      return result;
+      
     } catch (error) {
       console.error('[SIM] Error in webhook simulation:', error);
+      return null;
     }
   }
 
