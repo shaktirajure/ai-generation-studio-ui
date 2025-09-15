@@ -28,11 +28,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { db } = await import("./db");
       const { users } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-
       const [user] = await db.select({ credits: users.credits })
         .from(users)
-        .where(eq(users.id, DEMO_USER_ID));
+        .where({ column: 'id', value: DEMO_USER_ID });
 
       if (!user) {
         // Create demo user if doesn't exist

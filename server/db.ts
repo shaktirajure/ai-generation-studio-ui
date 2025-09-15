@@ -10,7 +10,7 @@ const jobs = new Map<string, Job>();
 const sessions = new Map<string, any>();
 
 // Demo user constants
-const DEMO_USER_ID = "demo-user-123";
+const DEMO_USER_ID = "demo-user";
 
 // Initialize demo user with 20 credits
 users.set(DEMO_USER_ID, {
@@ -57,28 +57,8 @@ class MockSelectQuery {
   }
 
   from(table: any) {
-    // Determine table type based on the table object
-    // Handle both Drizzle table objects and our mock tables
-    if (table?._?.name === 'users' || table === usersTable || 
-        (table && typeof table === 'object' && Object.keys(table).includes('username'))) {
-      this.tableName = 'users';
-    } else if (table?._?.name === 'jobs' || table === jobsTable ||
-               (table && typeof table === 'object' && Object.keys(table).includes('tool'))) {
-      this.tableName = 'jobs';
-    } else if (table?._?.name === 'sessions' || table === sessionsTable ||
-               (table && typeof table === 'object' && Object.keys(table).includes('heavyJobsThisHour'))) {
-      this.tableName = 'sessions';
-    } else {
-      // Fallback: try to determine by table name string representation
-      const tableStr = table?.toString?.() || '';
-      if (tableStr.includes('users') || (table && table.id && table.username)) {
-        this.tableName = 'users';
-      } else if (tableStr.includes('jobs') || (table && table.id && table.tool)) {
-        this.tableName = 'jobs';
-      } else if (tableStr.includes('sessions') || (table && table.id && table.userId)) {
-        this.tableName = 'sessions';
-      }
-    }
+    // Use the shared table resolution helper for consistency
+    this.tableName = resolveTableName(table);
     return this;
   }
 
@@ -193,19 +173,21 @@ class MockInsertQuery {
     } else if (tableName === 'jobs') {
       jobs.set(id, record);
       
-      // Simulate job progression
-      setTimeout(() => {
-        const job = jobs.get(id);
-        if (job && job.status === 'queued') {
-          // Generate appropriate output URLs based on tool type
-          let assetUrls: string[] = [];
-          
-          switch (job.tool) {
-            case 'text2mesh':
-              // GLB 3D model URL
-              assetUrls = ['https://modelviewer.dev/shared-assets/models/Astronaut.glb'];
-              break;
-            case 'text2image':
+      // Simulate job progression - DISABLED to prevent overwriting provider results
+      const enableSimulatedCompletion = false;
+      if (enableSimulatedCompletion) {
+        setTimeout(() => {
+          const job = jobs.get(id);
+          if (job && job.status === 'queued') {
+            // Generate appropriate output URLs based on tool type
+            let assetUrls: string[] = [];
+            
+            switch (job.tool) {
+              case 'text2mesh':
+                // GLB 3D model URL
+                assetUrls = ['https://modelviewer.dev/shared-assets/models/Astronaut.glb'];
+                break;
+              case 'text2image':
               // Generated image URL
               assetUrls = ['https://picsum.photos/512/512?random=' + Math.random()];
               break;
@@ -222,16 +204,17 @@ class MockInsertQuery {
               break;
             default:
               assetUrls = ['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='];
+            }
+            
+            jobs.set(id, {
+              ...job,
+              status: 'completed',
+              assetUrls,
+              updatedAt: new Date()
+            });
           }
-          
-          jobs.set(id, {
-            ...job,
-            status: 'completed',
-            assetUrls,
-            updatedAt: new Date()
-          });
-        }
-      }, 1500); // 1.5 seconds
+        }, 1500); // 1.5 seconds
+      }
       
     } else if (tableName === 'sessions') {
       sessions.set(id, record);
@@ -275,7 +258,7 @@ class MockUpdateQuery {
   }
 
   async execute(): Promise<any[]> {
-    const tableName = this.table?._?.name || this.getTableName(this.table);
+    const tableName = resolveTableName(this.table);
     let store: Map<string, any>;
     
     if (tableName === 'users') {
@@ -285,15 +268,20 @@ class MockUpdateQuery {
     } else if (tableName === 'sessions') {
       store = sessions;
     } else {
-      return [];
+      console.warn(`[UPDATE DEBUG] Unknown table: ${tableName}`, this.table);
+      throw new Error(`MockDatabase: Unknown table for update: ${tableName}`);
     }
 
     const updates: any[] = [];
     
+    console.log(`[UPDATE DEBUG] Table: ${tableName}, Where:`, this.whereCondition, 'Set:', this.setValues);
+    
     // Simple update logic
     if (this.whereCondition && this.whereCondition.column && this.whereCondition.value !== undefined) {
+      console.log(`[UPDATE DEBUG] Looking for ${this.whereCondition.column} = ${this.whereCondition.value}`);
       for (const record of store.values()) {
         if (record[this.whereCondition.column] === this.whereCondition.value) {
+          console.log(`[UPDATE DEBUG] Found matching record:`, record.id);
           const updatedRecord = {
             ...record,
             ...this.setValues,
@@ -301,10 +289,14 @@ class MockUpdateQuery {
           };
           store.set(record.id, updatedRecord);
           updates.push(updatedRecord);
+          console.log(`[UPDATE DEBUG] Updated record:`, updatedRecord);
         }
       }
+    } else {
+      console.log(`[UPDATE DEBUG] Invalid where condition:`, this.whereCondition);
     }
 
+    console.log(`[UPDATE DEBUG] Updates applied: ${updates.length}`);
     return updates;
   }
 
@@ -344,9 +336,56 @@ const sessionsTable = {
   heavyJobsThisHour: { column: 'heavyJobsThisHour' }
 };
 
-// Mock eq function for where conditions
+// Shared helper to resolve table names consistently
+function resolveTableName(table: any): string {
+  // Try _?.name property first (from schema definitions)
+  if (table?._?.name) return table._.name;
+  
+  // Check known mock tables
+  if (table === usersTable) return 'users';
+  if (table === jobsTable) return 'jobs'; 
+  if (table === sessionsTable) return 'sessions';
+  
+  // Fallback to heuristics for imported schema tables
+  if (table && typeof table === 'object') {
+    if (table.username || Object.keys(table).includes('username')) return 'users';
+    if (table.tool || Object.keys(table).includes('tool')) return 'jobs';
+    if (table.heavyJobsThisHour || Object.keys(table).includes('heavyJobsThisHour')) return 'sessions';
+  }
+  
+  // Last resort: check toString for schema table patterns
+  const tableStr = table?.toString?.() || '';
+  if (tableStr.includes('users')) return 'users';
+  if (tableStr.includes('jobs')) return 'jobs';
+  if (tableStr.includes('sessions')) return 'sessions';
+  
+  return '';
+}
+
+// Mock eq function for where conditions - robust to Drizzle column objects
 function eq(column: any, value: any) {
-  return { column: column.column, value };
+  // Extract column name with fallback chain for Drizzle compatibility
+  let col = column?.column ?? column?.name ?? column?._?.name;
+  
+  // Additional fallbacks for Drizzle schema columns
+  if (!col && column) {
+    // Check for table.columnName pattern (e.g., jobs.id)
+    if (typeof column === 'string') {
+      col = column;
+    } else if (column.enumValues) {
+      // Drizzle enum column
+      col = column.enumValues;
+    } else if (column.dataType) {
+      // Try to extract from dataType info
+      col = column.dataType;
+    } else {
+      // Last resort: assume it's the column name itself
+      col = 'id'; // Default for primary keys
+    }
+  }
+  
+  console.log(`[EQ DEBUG] Column input:`, column, 'Extracted col:', col);
+  return { column: col, value };
 }
 
 function and(...conditions: any[]) {

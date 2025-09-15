@@ -2,7 +2,7 @@
 
 import { db } from "./db";
 import { jobs, toolCosts, toolSchema, type Tool, type Job, sessions, users } from "@shared/schema";
-import { eq, and, gt, desc, sql } from "drizzle-orm";
+import { eq, and, gt, desc, sql } from "./db";
 import { ProviderFactory } from "./providers/provider-factory";
 import type { 
   TextToImageRequest, 
@@ -24,7 +24,7 @@ export class JobService {
   // Check if user has enough credits
   static async checkCredits(userId: string, tool: Tool): Promise<boolean> {
     const cost = toolCosts[tool];
-    const [user] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
+    const [user] = await db.select({ credits: users.credits }).from(users).where({ column: 'id', value: userId });
     return user && user.credits >= cost;
   }
 
@@ -37,7 +37,7 @@ export class JobService {
     
     // Get or create session
     let [session] = await db.select().from(sessions).where(
-      and(eq(sessions.userId, userId), eq(sessions.id, sessionId))
+      and({ column: 'userId', value: userId }, { column: 'id', value: sessionId })
     );
 
     if (!session) {
@@ -55,7 +55,7 @@ export class JobService {
           heavyJobsThisHour: 0,
           lastHeavyJobAt: new Date()
         })
-        .where(eq(sessions.id, sessionId));
+        .where({ column: 'id', value: sessionId });
       return true;
     }
 
@@ -84,14 +84,14 @@ export class JobService {
 
     // Deduct credits atomically
     await db.transaction(async (tx) => {
-      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      const [user] = await tx.select().from(users).where({ column: 'id', value: userId });
       if (!user || user.credits < cost) {
         throw new Error("Insufficient credits");
       }
       
       await tx.update(users)
         .set({ credits: user.credits - cost })
-        .where(eq(users.id, userId));
+        .where({ column: 'id', value: userId });
     });
 
     // Create job record and update heavy job counter if needed
@@ -136,7 +136,7 @@ export class JobService {
       // Update status to processing
       await db.update(jobs)
         .set({ status: "processing", updatedAt: new Date() })
-        .where(eq(jobs.id, jobId));
+        .where({ column: 'id', value: jobId });
 
       // Route to appropriate provider
       const providerJob = await this.routeToProvider(job);
@@ -147,7 +147,7 @@ export class JobService {
           providerJobId: providerJob.id,
           updatedAt: new Date()
         })
-        .where(eq(jobs.id, jobId));
+        .where({ column: 'id', value: jobId });
 
       // Start polling for completion (if not immediate)
       if (providerJob.status !== "completed") {
@@ -217,7 +217,10 @@ export class JobService {
         const provider = this.getProvider(job.tool as Tool);
         const providerJob = await provider.getJobStatus(providerJobId);
 
+        console.log(`[POLL DEBUG] Job ${jobId}, Provider Job ${providerJobId}, Status: ${providerJob.status}, Attempt: ${attempts}`);
+        
         if (providerJob.status === "completed") {
+          console.log(`[POLL DEBUG] Completing job ${jobId} with result:`, providerJob.result);
           await this.completeJob(jobId, providerJob);
         } else if (providerJob.status === "failed") {
           await this.failJob(jobId, providerJob.error || "Provider job failed");
@@ -238,21 +241,32 @@ export class JobService {
 
   // Complete a job
   private static async completeJob(jobId: string, providerJob: ProviderJob): Promise<void> {
-    const updateData: any = {
-      status: "completed",
-      assetUrls: providerJob.result?.assetUrls || null,
-      meta: providerJob.result?.meta || null,
-      updatedAt: new Date()
-    };
+    try {
+      console.log(`[COMPLETE DEBUG] Starting job completion for ${jobId}`);
+      
+      const updateData: any = {
+        status: "completed",
+        assetUrls: providerJob.result?.assetUrls || null,
+        meta: providerJob.result?.meta || null,
+        updatedAt: new Date()
+      };
 
-    // Include previewImage if it exists (for enhanced 3D generation)
-    if (providerJob.result?.previewImage) {
-      updateData.previewImage = providerJob.result.previewImage;
+      // Include previewImage if it exists (for enhanced 3D generation)
+      if (providerJob.result?.previewImage) {
+        updateData.previewImage = providerJob.result.previewImage;
+      }
+
+      console.log(`[COMPLETE DEBUG] Update data:`, updateData);
+
+      await db.update(jobs)
+        .set(updateData)
+        .where({ column: 'id', value: jobId });
+        
+      console.log(`[COMPLETE DEBUG] Successfully completed job ${jobId}`);
+    } catch (error) {
+      console.error(`[COMPLETE ERROR] Failed to complete job ${jobId}:`, error);
+      throw error;
     }
-
-    await db.update(jobs)
-      .set(updateData)
-      .where(eq(jobs.id, jobId));
   }
 
   // Fail a job and refund credits

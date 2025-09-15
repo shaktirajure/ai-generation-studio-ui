@@ -23,6 +23,9 @@ const SIM_ASSETS = {
 
 // Prompt-based 3D model selection for simulation
 const PROMPT_TO_MODEL = {
+  // Kitchen/household items (including teapot for testing)
+  'teapot|kettle|pot|kitchen|tea|coffee': 'https://threejs.org/examples/models/gltf/teapot.gltf',
+  
   // Robots, machines, tech
   'robot|android|mech|machine|tech|cyber|futuristic': 'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
   
@@ -33,7 +36,7 @@ const PROMPT_TO_MODEL = {
   'car|vehicle|truck|ship|plane|boat|motorcycle': 'https://threejs.org/examples/models/gltf/ferrari.glb',
   
   // Natural objects and plants
-  'flower|plant|tree|garden|nature|organic|bloom|petal': 'https://threejs.org/examples/models/gltf/Xbot.glb',
+  'flower|plant|tree|garden|nature|organic|bloom|petal|rose|tulip|lily|daisy': 'https://modelviewer.dev/shared-assets/models/Flower/Flower.glb',
   
   // Buildings and architecture
   'house|building|castle|tower|structure|architecture': 'https://threejs.org/examples/models/gltf/LittlestTokyo.glb',
@@ -160,6 +163,7 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
               note: `Generated 3D model with image preview for: "${request.prompt}"`
             }
           };
+          console.log(`[SIM DEBUG] Text2Mesh job ${job.id} completed with preview image and model: ${selectedModel}`);
         } else {
           // Fallback to 3D only if image generation fails
           job.status = "completed";
@@ -172,9 +176,15 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
               note: `Generated 3D model for: "${request.prompt}"`
             }
           };
+          console.log(`[SIM DEBUG] Text2Mesh job ${job.id} completed with model only: ${selectedModel}`);
         }
         
         this.jobs.set(job.id, job);
+        
+        // Simulate webhook delivery if enabled
+        if (process.env.SIMULATE_WEBHOOKS === 'true') {
+          await this.simulateWebhookWithFileDownload(job.id, job.result);
+        }
       } catch (error) {
         job.status = "failed";
         job.error = error instanceof Error ? error.message : "3D generation failed";
@@ -242,5 +252,66 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
       throw new Error(`Job ${jobId} not found`);
     }
     return job;
+  }
+
+  // Simulate webhook with file download for comprehensive testing
+  private async simulateWebhookWithFileDownload(jobId: string, result: any): Promise<void> {
+    const baseUrl = process.env.BASE_URL;
+    if (!baseUrl) {
+      console.log('[SIM] No BASE_URL configured, skipping webhook simulation');
+      return;
+    }
+
+    try {
+      // For 3D models, download and store locally
+      if (result?.assetUrls?.[0]) {
+        const { FileService } = await import('../file-service');
+        const modelUrl = result.assetUrls[0];
+        
+        // Extract job ID for file naming
+        const jobIdPart = jobId.split('_')[1] || jobId;
+        const localPath = await FileService.downloadAndStore(modelUrl, jobIdPart, '.glb');
+        
+        // Update result to use local path
+        result.assetUrls = [localPath];
+        result.meta = {
+          ...result.meta,
+          originalUrl: modelUrl,
+          localPath,
+        };
+        
+        console.log(`[SIM] Downloaded model to: ${localPath}`);
+      }
+
+      // Send webhook
+      const webhookUrl = `${baseUrl}/api/webhooks/vendor`;
+      const payload = {
+        jobId,
+        status: 'completed',
+        result,
+      };
+
+      const signature = this.createWebhookSignature(JSON.stringify(payload));
+      
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-signature': signature,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log(`[SIM] Sent webhook for job ${jobId} with local file`);
+      
+    } catch (error) {
+      console.error('[SIM] Error in webhook simulation:', error);
+    }
+  }
+
+  private createWebhookSignature(payload: string): string {
+    const crypto = require('crypto');
+    const secret = process.env.WEBHOOK_SECRET || 'default-webhook-secret';
+    return `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
   }
 }

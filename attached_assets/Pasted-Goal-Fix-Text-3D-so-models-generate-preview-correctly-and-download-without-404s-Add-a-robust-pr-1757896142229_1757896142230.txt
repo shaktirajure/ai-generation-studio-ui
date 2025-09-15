@@ -1,0 +1,119 @@
+Goal: Fix Text→3D so models generate, preview correctly, and download without 404s. Add a robust, provider-agnostic flow with SIM mode for cheap testing.
+
+Do the following end-to-end (no partial workarounds):
+
+Provider & Modes
+
+Add env-selectable provider for Text→3D:
+
+PROVIDER_3D = "SIM" | "MESHY" | "REPLICATE"
+
+If keys are missing, default to SIM (returns a known public .glb) so I can test without credits.
+
+Support SIMULATE_WEBHOOKS=true to auto-deliver a signed webhook ~6s after kickoff.
+
+Job Lifecycle & Webhooks
+
+Create a unified job model:
+{ id, tool:"text2mesh", prompt, status, asset_url, meta, created_at, session_id }
+
+Kickoff route returns a job.id.
+
+Add /api/jobs/:id for polling.
+
+Add /api/webhooks/vendor with HMAC SHA256 verification via WEBHOOK_SECRET (header x-signature over raw body). Webhooks must be idempotent (ignore duplicates).
+
+Never Save Short-Lived Vendor URLs
+
+When a provider finishes, download the resulting 3D file on the server and save it under /uploads/<jobId>.glb.
+
+Store /uploads/<jobId>.glb in the job record, not the vendor URL. This eliminates future 404s from expired links.
+
+Static File Serving (Fix 404s)
+
+Serve the uploads directory publicly in dev & prod:
+
+Route /uploads → local uploads/ folder.
+
+Ensure correct MIME types so loaders work:
+
+.glb → model/gltf-binary
+
+.gltf → model/gltf+json
+
+also allow .bin, .ktx2, .png, .jpg (buffers/textures)
+
+3D Viewer Reliability
+
+The viewer must load the public URL (e.g., https://<repl>.replit.dev/uploads/<id>.glb), not a filesystem path.
+
+Add basic environment/hemisphere lighting so dark models are visible.
+
+If the model references external buffers/textures, ensure the relative files exist and are served. Prefer .glb (self-contained) to avoid path issues.
+
+Show a friendly error if the loader receives 404/invalid asset.
+
+Front-End UX (Generate page)
+
+Tabs/selector for tools (keep existing), ensure Text→3D tab:
+
+Shows prompt → kickoff job → display Queued/Processing state.
+
+Poll /api/jobs/:id until succeeded/failed.
+
+On success: show the model in the viewer and a Download button (disabled until file exists).
+
+If credits are implemented, block if insufficient and show a clear message. (Keep current credit UI; don’t remove features.)
+
+Environment & Settings
+
+Use these env vars (read from Replit Secrets):
+
+PROVIDER_3D
+
+MESHY_API_KEY (if provider=Meshy)
+
+REPLICATE_API_TOKEN (if provider=Replicate)
+
+WEBHOOK_SECRET
+
+BASE_URL = https://<your-repl>.replit.dev (for webhook callback)
+
+SIMULATE_WEBHOOKS (true/false)
+
+If any required key is missing and provider isn’t SIM, return a clear error toast:
+“Text→3D provider not configured. Using SIM mode or add keys in Secrets.”
+
+Diagnostics & Errors
+
+Log outbound provider payloads and webhook results in dev.
+
+Return structured JSON errors { code, message, detail? }.
+
+Surface a user-friendly toast + keep failed job with red badge & “Retry”.
+
+Acceptance Tests (run these before finishing)
+
+SIM Mode: PROVIDER_3D=SIM, SIMULATE_WEBHOOKS=true
+
+Generate “teapot”. Confirm:
+
+/api/jobs/:id goes to succeeded
+
+Viewer shows a .glb
+
+Download uses /uploads/<id>.glb (works; no 404)
+
+Provider Mode: set real provider (MESHY or REPLICATE) with keys + BASE_URL
+
+Generate “lotus flower sculpture”. Confirm:
+
+Kickoff OK, webhook verified, job saved with local /uploads/<id>.glb
+
+Viewer preview OK
+
+Download OK (no 404)
+
+Paste the preview & download URLs into the browser directly—must not 404.
+
+Do not remove existing working features or the studio styling. Only extend/fix the Text→3D pipeline per above.

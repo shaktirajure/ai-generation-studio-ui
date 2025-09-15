@@ -31,6 +31,7 @@ interface JobStatusProps {
 
 export function JobStatus({ jobId, onClose }: JobStatusProps) {
   const [progress, setProgress] = useState(0);
+  const [modelError, setModelError] = useState(false);
 
   const { data: job, isLoading, error } = useQuery({
     queryKey: ["/api/jobs", jobId],
@@ -175,7 +176,7 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
           <div>
             <div className="text-white/40 text-sm mb-2">3D Model:</div>
             <div className="h-64 bg-black/20 rounded-lg relative overflow-hidden flex items-center justify-center">
-              {firstAsset ? (
+              {firstAsset && !modelError ? (
                 <model-viewer
                   src={firstAsset}
                   alt="Generated 3D model"
@@ -185,7 +186,8 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
                   ar="false"
                   xr-environment="false"
                   loading="lazy"
-                  reveal="interaction"
+                  reveal="auto"
+                  crossorigin="anonymous"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -193,17 +195,27 @@ export function JobStatus({ jobId, onClose }: JobStatusProps) {
                   }}
                   data-testid="model-viewer"
                   onError={(e: any) => {
-                    console.warn('Model viewer error (suppressed):', e);
-                    if (e && e.stopPropagation) e.stopPropagation();
-                    if (e && e.preventDefault) e.preventDefault();
-                    return false;
+                    console.error('Model failed to load:', e);
+                    setModelError(true);
                   }}
                 />
-              ) : (
+              ) : modelError ? (
+                <div className="text-center">
+                  <div className="text-red-400 text-sm mb-2">Model failed to load</div>
+                  <Button 
+                    onClick={() => setModelError(false)}
+                    variant="outline" 
+                    size="sm"
+                    data-testid="button-retry-model"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : !firstAsset ? (
                 <div className="text-white/40 text-sm">
                   Loading 3D model...
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

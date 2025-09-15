@@ -8,6 +8,8 @@ import {
   ProviderConfig
 } from "./types";
 import { SimProvider } from "./sim-provider";
+import { MeshyProvider } from "./meshy-provider";
+import { ReplicateProvider } from "./replicate-provider";
 
 // Get provider configuration from environment
 export function getProviderConfig(): ProviderConfig {
@@ -46,13 +48,29 @@ export function createTextTo3DProvider(): ITextTo3DProvider {
   
   switch (config.text2mesh) {
     case "MESHY":
-      // TODO: Implement Meshy provider when API keys are available
-      console.log("MESHY provider not implemented yet, falling back to SIM");
-      return getSimProvider();
+      const meshyKey = process.env.MESHY_API_KEY;
+      if (!meshyKey) {
+        console.warn("[PROVIDER] MESHY_API_KEY not found, falling back to SIM mode");
+        return getSimProvider();
+      }
+      try {
+        return new MeshyProvider(meshyKey);
+      } catch (error) {
+        console.error("[PROVIDER] Failed to create Meshy provider, falling back to SIM:", error);
+        return getSimProvider();
+      }
     case "REPLICATE":
-      // TODO: Implement Replicate provider when API keys are available
-      console.log("REPLICATE provider not implemented yet, falling back to SIM");
-      return getSimProvider();
+      const replicateToken = process.env.REPLICATE_API_TOKEN;
+      if (!replicateToken) {
+        console.warn("[PROVIDER] REPLICATE_API_TOKEN not found, falling back to SIM mode");
+        return getSimProvider();
+      }
+      try {
+        return new ReplicateProvider(replicateToken);
+      } catch (error) {
+        console.error("[PROVIDER] Failed to create Replicate provider, falling back to SIM:", error);
+        return getSimProvider();
+      }
     case "SIM":
     default:
       return getSimProvider();
