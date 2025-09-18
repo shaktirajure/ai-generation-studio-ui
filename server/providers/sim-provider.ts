@@ -24,25 +24,25 @@ const SIM_ASSETS = {
 // Prompt-based 3D model selection for simulation
 const PROMPT_TO_MODEL = {
   // Kitchen/household items (including teapot for testing)
-  'teapot|kettle|pot|kitchen|tea|coffee': 'https://threejs.org/examples/models/gltf/teapot.gltf',
+  'teapot|kettle|pot|kitchen|tea|coffee': 'https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/Teapot/glTF/Teapot.gltf',
   
   // Robots, machines, tech
   'robot|android|mech|machine|tech|cyber|futuristic': 'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
   
   // Animals and creatures
-  'dog|cat|animal|pet|creature|dragon|bird|fish': 'https://threejs.org/examples/models/gltf/Horse.glb',
+  'dog|cat|animal|pet|creature|dragon|bird|fish': 'https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/Fox/glTF/Fox.gltf',
   
   // Vehicles and transportation
-  'car|vehicle|truck|ship|plane|boat|motorcycle': 'https://threejs.org/examples/models/gltf/ferrari.glb',
+  'car|vehicle|truck|ship|plane|boat|motorcycle': 'https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf',
   
   // Natural objects and plants
   'flower|plant|tree|garden|nature|organic|bloom|petal|rose|tulip|lily|daisy': 'https://modelviewer.dev/shared-assets/models/Flower/Flower.glb',
   
   // Buildings and architecture
-  'house|building|castle|tower|structure|architecture': 'https://threejs.org/examples/models/gltf/LittlestTokyo.glb',
+  'house|building|castle|tower|structure|architecture': 'https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/BoomBox/glTF/BoomBox.gltf',
   
   // Default fallback
-  'default': 'https://threejs.org/examples/models/gltf/DamagedHelmet/DamagedHelmet.gltf'
+  'default': 'https://modelviewer.dev/shared-assets/models/glTF-Sample-Models/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf'
 };
 
 function selectModelFromPrompt(prompt: string): string {
@@ -183,13 +183,18 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
         console.log(`[SIM DEBUG] About to simulate webhook for job ${job.id}, SIMULATE_WEBHOOKS=${process.env.SIMULATE_WEBHOOKS}`);
         if (process.env.SIMULATE_WEBHOOKS === 'true') {
           console.log(`[SIM DEBUG] Original job.result.assetUrls: ${JSON.stringify(job.result?.assetUrls)}`);
-          const updatedResult = await this.simulateWebhookWithFileDownload(job.id, job.result);
-          if (updatedResult) {
-            // Update the job with the new result that has local file paths
-            console.log(`[SIM DEBUG] Updated result.assetUrls: ${JSON.stringify(updatedResult.assetUrls)}`);
-            job.result = updatedResult;
-          } else {
-            console.log(`[SIM DEBUG] No updated result returned from webhook simulation`);
+          try {
+            const updatedResult = await this.simulateWebhookWithFileDownload(job.id, job.result);
+            if (updatedResult) {
+              // Update the job with the new result that has local file paths
+              console.log(`[SIM DEBUG] Updated result.assetUrls: ${JSON.stringify(updatedResult.assetUrls)}`);
+              job.result = updatedResult;
+              console.log(`[SIM DEBUG] Successfully updated job ${job.id} with local file paths`);
+            } else {
+              console.log(`[SIM DEBUG] No updated result returned from webhook simulation`);
+            }
+          } catch (error) {
+            console.error(`[SIM ERROR] Failed to simulate webhook for job ${job.id}:`, error);
           }
         }
         
@@ -277,9 +282,9 @@ export class SimProvider implements ITextToImageProvider, ITextTo3DProvider, ITe
         const { FileService } = await import('../file-service');
         const modelUrl = result.assetUrls[0];
         
-        // Extract job ID for file naming
+        // Extract job ID for file naming - auto-detect extension from URL
         const jobIdPart = jobId.split('_')[1] || jobId;
-        const localPath = await FileService.downloadAndStore(modelUrl, jobIdPart, '.glb');
+        const localPath = await FileService.downloadAndStore(modelUrl, jobIdPart);
         
         // Update result to use local path
         result.assetUrls = [localPath];

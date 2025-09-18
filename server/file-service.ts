@@ -18,8 +18,14 @@ export class FileService {
   }
 
   // Download file from URL and save locally
-  static async downloadAndStore(url: string, jobId: string, extension: string = '.glb'): Promise<string> {
+  static async downloadAndStore(url: string, jobId: string, extension?: string): Promise<string> {
     await this.ensureUploadsDir();
+    
+    // Auto-detect extension from URL if not provided
+    if (!extension) {
+      const urlPath = new URL(url).pathname;
+      extension = path.extname(urlPath) || '.glb';
+    }
     
     const filename = `${jobId}${extension}`;
     const filePath = path.join(this.UPLOADS_DIR, filename);
